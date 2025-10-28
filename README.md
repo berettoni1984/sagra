@@ -51,7 +51,12 @@ git clone https://github.com/berettoni1984/sagra.git
 cd sagra
 
 # Installa le dipendenze PHP
-composer install
+docker run --rm \
+    -u "$(id -u):$(id -g)" \
+    -v "$(pwd):/var/www/html" \
+    -w /var/www/html \
+    laravelsail/php83-composer:latest \
+    composer install --ignore-platform-reqs
 
 # Copia il file .env e configura le variabili (DB, APP_URL, ecc.)
 cp .env.example .env
