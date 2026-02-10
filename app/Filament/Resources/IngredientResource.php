@@ -7,6 +7,7 @@ use App\Models\Ingredient;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -17,11 +18,11 @@ class IngredientResource extends Resource
 {
     protected static ?string $model = Ingredient::class;
 
-    protected static ?string $navigationGroup = 'filament.settings';
+    protected static string|null|\UnitEnum $navigationGroup = 'filament.settings';
 
     protected static ?int $navigationSort = 8;
 
-    protected static ?string $navigationIcon = 'heroicon-o-beaker';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-beaker';
 
     public static function getLabel(): ?string
     {
@@ -38,9 +39,9 @@ class IngredientResource extends Resource
         return __('filament.ingredient_label_plural');
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
+        return $schema
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required()

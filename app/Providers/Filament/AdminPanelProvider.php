@@ -35,7 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->sidebarFullyCollapsibleOnDesktop()
             ->viteTheme('resources/css/filament/admin/theme.css')
-            ->maxContentWidth(MaxWidth::Full)
+           // ->maxContentWidth(MaxWidth::Full)
             ->colors([
                 'primary' => Color::Amber,
             ])->font(

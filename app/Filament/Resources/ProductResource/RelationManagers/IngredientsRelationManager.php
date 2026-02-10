@@ -6,6 +6,7 @@ use App\Models\Ingredient;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -13,9 +14,9 @@ class IngredientsRelationManager extends RelationManager
 {
     protected static string $relationship = 'ingredients';
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
+        return $schema
             ->schema([
 
                 Forms\Components\TextInput::make('qty')

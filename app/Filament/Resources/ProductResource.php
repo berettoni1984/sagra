@@ -12,6 +12,7 @@ use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
@@ -25,11 +26,11 @@ class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
-    protected static ?string $navigationGroup = 'filament.settings';
+    protected static string|null|\UnitEnum $navigationGroup = 'filament.settings';
 
     protected static ?int $navigationSort = 5;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cake';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-cake';
 
     public static function getLabel(): ?string
     {
@@ -46,9 +47,9 @@ class ProductResource extends Resource
         return __('filament.product_label_plural');
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
+        return $schema
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required()

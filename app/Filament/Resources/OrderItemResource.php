@@ -27,11 +27,11 @@ class OrderItemResource extends Resource
 {
     protected static ?string $model = OrderItem::class;
 
-    protected static ?string $navigationGroup = 'filament.statistics';
+    protected static string|null|\UnitEnum $navigationGroup = 'filament.statistics';
 
     protected static ?int $navigationSort = 100;
 
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-chart-bar';
 
     public static function getLabel(): ?string
     {

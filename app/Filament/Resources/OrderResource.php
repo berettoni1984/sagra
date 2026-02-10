@@ -10,6 +10,7 @@ use App\Models\Queue;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -26,11 +27,11 @@ class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static ?string $navigationGroup = 'filament.work';
+    protected static string|null|\UnitEnum $navigationGroup = 'filament.work';
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-list-bullet';
 
     /**
      * @param  Order  $record
@@ -67,7 +68,7 @@ class OrderResource extends Resource
      * @SuppressWarnings("PHPMD.ExcessiveMethodLength")
      * @SuppressWarnings("PHPMD.NPathComplexity")
      */
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
         $row = [
             Forms\Components\Hidden::make('id')
@@ -140,7 +141,7 @@ class OrderResource extends Resource
                 ->columnSpan(['default' => 4, 'lg' => 2, 'sm' => 2, 'md' => 4]),
         ];
 
-        return $form
+        return $schema
             ->columns(['default' => 4, 'lg' => 8, 'md' => 8, 'sm' => 4])
             ->schema([
                 Forms\Components\Hidden::make('id')->hiddenOn(['create', 'view']),
