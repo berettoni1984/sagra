@@ -6,7 +6,6 @@ use App\Filament\Resources\QueueResource\Pages;
 use App\Models\Queue;
 use Carbon\Carbon;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -30,8 +29,12 @@ class QueueResource extends Resource
         return __('filament.queue_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -92,9 +95,9 @@ class QueueResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('resetNumber')
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
+                \Filament\Actions\Action::make('resetNumber')
                     ->label(__('filament.reset_number'))
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
@@ -106,9 +109,9 @@ class QueueResource extends Resource
                     ->color('danger')
                     ->requiresConfirmation(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

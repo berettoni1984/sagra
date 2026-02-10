@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\IngredientResource\Pages;
 use App\Models\Ingredient;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -29,8 +28,12 @@ class IngredientResource extends Resource
         return __('filament.ingredient_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -72,12 +75,12 @@ class IngredientResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

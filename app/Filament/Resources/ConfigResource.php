@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ConfigResource\Pages;
 use App\Models\Config;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -18,7 +17,7 @@ class ConfigResource extends Resource
 {
     protected static ?string $model = Config::class;
 
-    protected static string|null|\UnitEnum $navigationGroup =  'filament.settings';
+    protected static string|null|\UnitEnum $navigationGroup = 'filament.settings';
 
     protected static ?int $navigationSort = 7;
 
@@ -29,8 +28,12 @@ class ConfigResource extends Resource
         return __('filament.config_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -67,16 +70,16 @@ class ConfigResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-            ], position: \Filament\Tables\Enums\ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
+            ], position: \Filament\Tables\Enums\RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ])
             ->emptyStateActions([
-                Tables\Actions\CreateAction::make(),
+                \Filament\Actions\CreateAction::make(),
             ]);
     }
 

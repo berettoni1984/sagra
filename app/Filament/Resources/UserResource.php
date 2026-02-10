@@ -5,12 +5,14 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
+/**
+ * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
+ */
 class UserResource extends Resource
 {
     protected static ?string $model = User::class;
@@ -26,8 +28,12 @@ class UserResource extends Resource
         return __('filament.user_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -81,16 +87,16 @@ class UserResource extends Resource
             ])
             ->filters([
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
         //            ->emptyStateActions([
-        //                Tables\Actions\CreateAction::make(),
+        //                \Filament\Actions\CreateAction::make(),
         //            ])
     }
 

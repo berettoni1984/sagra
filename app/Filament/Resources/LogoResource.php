@@ -5,7 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\LogoResource\Pages;
 use App\Models\Logo;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -29,8 +28,12 @@ class LogoResource extends Resource
         return __('filament.logo_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -82,12 +85,12 @@ class LogoResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                \Filament\Actions\ViewAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }

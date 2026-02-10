@@ -4,7 +4,6 @@ namespace App\Filament\Resources\ProductResource\RelationManagers;
 
 use App\Models\Ingredient;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -42,8 +41,8 @@ class IngredientsRelationManager extends RelationManager
             ])
             ->headerActions([
 
-                Tables\Actions\AttachAction::make()
-                    ->form(fn (Tables\Actions\AttachAction $action): array => [
+                \Filament\Actions\AttachAction::make()
+                    ->form(fn (\Filament\Actions\AttachAction $action): array => [
                         Forms\Components\Select::make('recordId')
                             ->label(__('filament.Ingredient'))
                             ->required()
@@ -69,13 +68,13 @@ class IngredientsRelationManager extends RelationManager
                             ->required(),
                     ]),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DetachAction::make(),
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
+                \Filament\Actions\DetachAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DetachBulkAction::make(),
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DetachBulkAction::make(),
                 ]),
             ]);
     }

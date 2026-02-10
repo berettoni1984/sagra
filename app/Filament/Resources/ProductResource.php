@@ -10,7 +10,6 @@ use App\Models\Queue;
 use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -37,8 +36,12 @@ class ProductResource extends Resource
         return __('filament.product_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -152,7 +155,7 @@ class ProductResource extends Resource
             ->filters([
                 Filter::make('created_at_range')
                     ->form([
-                        Forms\Components\Fieldset::make(__('filament.created_at_range'))
+                        \Filament\Schemas\Components\Fieldset::make(__('filament.created_at_range'))
                             ->schema([
                                 DateTimePicker::make('created_from')
                                     ->label(__('filament.From')),
@@ -242,13 +245,13 @@ class ProductResource extends Resource
             ])
             ->selectCurrentPageOnly(false)
             ->filtersLayout(FiltersLayout::AboveContent)
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                \Filament\Actions\EditAction::make(),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\BulkAction::make('queues')
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
+                    \Filament\Actions\BulkAction::make('queues')
                         ->label(__('filament.Queue'))
                         ->form([
                             Forms\Components\Select::make('queues')
@@ -257,7 +260,7 @@ class ProductResource extends Resource
                                 ->options(Queue::all()->pluck('label', 'id'))
                                 ->required(),
                         ])
-                        ->action(function (Tables\Actions\BulkAction $action, \Illuminate\Support\Collection $records, array $data) {
+                        ->action(function (\Filament\Actions\BulkAction $action, \Illuminate\Support\Collection $records, array $data) {
                             foreach ($records as $record) {
                                 $record->queues()->sync($data['queues'] ?? null);
                                 $record->save();
@@ -268,7 +271,7 @@ class ProductResource extends Resource
                 ]),
             ])
             ->emptyStateActions([
-                Tables\Actions\CreateAction::make(),
+                \Filament\Actions\CreateAction::make(),
             ]);
     }
 

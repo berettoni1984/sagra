@@ -8,7 +8,6 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Queue;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
@@ -49,8 +48,12 @@ class OrderResource extends Resource
         return parent::canEdit($record);
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -314,24 +317,24 @@ class OrderResource extends Resource
             ->filters([
                 //
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()
+            ->recordActions([
+                \Filament\Actions\ViewAction::make()
                     ->hidden(fn ($record) => static::canEdit($record)),
-                Tables\Actions\EditAction::make()
+                \Filament\Actions\EditAction::make()
                     ->hidden(fn ($record) => ! static::canEdit($record)),
-                Tables\Actions\Action::make('print')
+                \Filament\Actions\Action::make('print')
                     ->icon('heroicon-o-printer')
                     ->url(fn ($record) => static::getUrl('print', ['record' => $record->id, 'print' => true]))
                     ->label(__('filament.Print')),
-            ], position: \Filament\Tables\Enums\ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: \Filament\Tables\Enums\RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
                 ]),
             ])
             ->selectCurrentPageOnly(false)
             ->emptyStateActions([
-                Tables\Actions\CreateAction::make(),
+                \Filament\Actions\CreateAction::make(),
             ]);
     }
 

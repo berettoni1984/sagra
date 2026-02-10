@@ -9,7 +9,6 @@ use App\Models\Product;
 use App\Models\Queue;
 use App\Models\User;
 use Carbon\Carbon;
-use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -38,8 +37,12 @@ class OrderItemResource extends Resource
         return __('filament.order_item_label');
     }
 
-    public static function getNavigationGroup(): ?string
+    public static function getNavigationGroup(): string|\UnitEnum|null
     {
+        if (static::$navigationGroup instanceof \UnitEnum) {
+            return static::$navigationGroup;
+        }
+
         return __(static::$navigationGroup);
     }
 
@@ -105,7 +108,7 @@ class OrderItemResource extends Resource
             ->filters([
                 Filter::make('created_at_range')
                     ->form([
-                        Forms\Components\Fieldset::make(__('filament.created_at_range'))
+                        \Filament\Schemas\Components\Fieldset::make(__('filament.created_at_range'))
                             ->schema([
                                 DateTimePicker::make('created_from')
                                     ->label(__('filament.From')),
@@ -174,9 +177,9 @@ class OrderItemResource extends Resource
                     ),
             ])
             ->filtersLayout(FiltersLayout::AboveContent)
-            ->actions([
+            ->recordActions([
             ])
-            ->bulkActions([
+            ->toolbarActions([
             ]);
     }
 

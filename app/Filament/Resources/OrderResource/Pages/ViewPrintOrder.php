@@ -11,7 +11,7 @@ class ViewPrintOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
 
-    protected string $view =  'filament.view-record';
+    protected string $view = 'filament.view-record';
 
     protected function getHeaderActions(): array
     {
