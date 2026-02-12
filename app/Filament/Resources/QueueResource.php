@@ -50,6 +50,7 @@ class QueueResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->label(__('filament.Name')),
                 Forms\Components\TextInput::make('comment')
+                    ->required()
                     ->label(__('filament.Comment')),
                 Forms\Components\TextInput::make('order_number')
                     ->numeric()

@@ -82,21 +82,18 @@ class ProductResource extends Resource
                     ->default(false),
                 Forms\Components\Select::make('queues')
                     ->multiple()
-                    ->relationship('queues')
-                    ->required()
-                    ->options(fn () => Queue::all()->pluck('label', 'id'))
                     ->label(__('filament.queue_label_plural'))
+                    ->options(fn () => Queue::all()->pluck('label', 'id'))
                     ->searchable()
-                    ->getSearchResultsUsing(
-                        function (string $search) {
-                            return Queue::query()
-                                ->where('name', 'like', "%{$search}%")
-                                ->where('comment', 'like', "%{$search}%")
-                                ->get()
-                                ->pluck('label', 'id');
-                        }
+                    ->formatStateUsing(
+                        fn ($record) => $record ?
+                            $record->queues->pluck('id')->toArray() :
+                            Queue::whereIsDefault(true)->pluck('id')->toArray()
                     )
-                    ->default(fn () => [Queue::whereIsDefault(true)->first()?->id]),
+                    ->saveRelationshipsUsing(function ($component, $state) {
+                        $component->getRecord()->queues()->sync($state ?? []);
+                    })
+                    ->dehydrated(false),
             ]);
     }
 
@@ -154,7 +151,7 @@ class ProductResource extends Resource
             ])
             ->filters([
                 Filter::make('created_at_range')
-                    ->form([
+                    ->schema([
                         \Filament\Schemas\Components\Fieldset::make(__('filament.created_at_range'))
                             ->schema([
                                 DateTimePicker::make('created_from')
@@ -207,7 +204,7 @@ class ProductResource extends Resource
                     })
                     ->label(__('filament.Created At Range')),
                 Tables\Filters\Filter::make('queue')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('queue')
                             ->label(__('filament.queue_label_plural'))
                             ->multiple()

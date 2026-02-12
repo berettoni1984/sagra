@@ -155,6 +155,7 @@ class OrderResource extends Resource
                     ->columnSpan(['default' => 4, 'lg' => 8, 'md' => 8, 'sm' => 4])
                     ->columns(['default' => 4, 'lg' => 7, 'md' => 7, 'sm' => 4])
                     ->relationship('orderItems')
+                    ->minItems(1)
                     ->schema($row)
                     ->addAction(fn ($action) => $action->color('danger')
                         ->icon('heroicon-o-plus')
@@ -377,7 +378,7 @@ class OrderResource extends Resource
     {
         $res = [];
         foreach ($orderItems as $orderItem) {
-            if ($orderItem['product_id'] !== $pId) {
+            if (((int) $orderItem['product_id']) !== $pId) {
                 $res[] = $orderItem['product_id'];
             }
         }
@@ -438,7 +439,7 @@ class OrderResource extends Resource
     }
 
     /**
-     * @return Collection<int|string,string>
+     * @return Collection<int,string>
      */
     public static function getProducts(callable $get, ?string $search = null): Collection
     {
@@ -456,7 +457,8 @@ class OrderResource extends Resource
             $selectedProducts = static::getSelectedProducts($get('../../orderItems'), (int) $get('product_id'));
         }
 
-        $response = $products->except($selectedProducts);
+        $response = $products->except($selectedProducts)
+            ->mapWithKeys(fn ($value, $key) => [(int) $key => (string) $value]);
 
         return $response;
     }

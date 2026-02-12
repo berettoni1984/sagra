@@ -42,7 +42,7 @@ class IngredientsRelationManager extends RelationManager
             ->headerActions([
 
                 \Filament\Actions\AttachAction::make()
-                    ->form(fn (\Filament\Actions\AttachAction $action): array => [
+                    ->schema(fn (\Filament\Actions\AttachAction $action): array => [
                         Forms\Components\Select::make('recordId')
                             ->label(__('filament.Ingredient'))
                             ->required()

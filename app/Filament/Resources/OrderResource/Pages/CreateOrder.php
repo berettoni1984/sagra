@@ -6,7 +6,6 @@ use App\Filament\Resources\OrderResource;
 use App\Models\Ingredient;
 use App\Models\Queue;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateOrder extends CreateRecord
@@ -39,18 +38,6 @@ class CreateOrder extends CreateRecord
         $resource = static::getResource();
 
         return $resource::getUrl('print', ['record' => $this->getRecord(), 'print' => true]);
-    }
-
-    /**
-     * @return array<Action | ActionGroup>
-     */
-    protected function getFormActions(): array
-    {
-        return [
-            $this->getCreateFormAction(),
-            ...(static::canCreateAnother() ? [$this->getCreateAnotherFormAction()] : []),
-            $this->getCancelFormAction(),
-        ];
     }
 
     public function afterCreate(): void
