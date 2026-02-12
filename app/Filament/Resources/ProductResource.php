@@ -253,7 +253,7 @@ class ProductResource extends Resource
                     \Filament\Actions\DeleteBulkAction::make(),
                     \Filament\Actions\BulkAction::make('queues')
                         ->label(__('filament.Queue'))
-                        ->form([
+                        ->schema([
                             Forms\Components\Select::make('queues')
                                 ->label(__('filament.queue_label_plural'))
                                 ->multiple()
