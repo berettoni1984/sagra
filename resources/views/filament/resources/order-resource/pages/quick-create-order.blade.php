@@ -234,6 +234,27 @@
                             </div>
                         @endif
 
+                        {{-- Change Price (Total Paid) --}}
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                {{ __('filament.Change Price') }} ({{ __('filament.Total Paid') }})
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    wire:model.live="customTotalPaid"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                                />
+                                <span class="text-sm text-gray-500 dark:text-gray-400">€</span>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {{ __('filament.Leave empty to use full amount') }}
+                            </p>
+                        </div>
+
                         <div class="flex justify-between items-center text-xl font-bold">
                             <span class="text-gray-900 dark:text-white">{{ __('filament.Total') }}</span>
                             <span class="text-gray-900 dark:text-white">

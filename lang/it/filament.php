@@ -109,5 +109,7 @@ return [
     'Split item' => 'Dividi riga',
     'Cart cleared' => 'Carrello svuotato',
     'Cart has been cleared due to queue change' => 'Il carrello è stato svuotato a causa del cambio di coda',
+    'Change Price' => 'Cambia Prezzo',
+    'Leave empty to use full amount' => 'Lascia vuoto per usare l\'importo completo',
 
 ];

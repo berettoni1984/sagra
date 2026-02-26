@@ -29,6 +29,8 @@ class QuickCreateOrder extends Page
 
     public bool $free = false;
 
+    public ?float $customTotalPaid = null;
+
     protected $listeners = ['create-order' => 'createOrder'];
 
     public function mount(): void
@@ -210,7 +212,14 @@ class QuickCreateOrder extends Page
                 });
             }
 
-            $totalPaid = $this->free ? '0.00' : number_format($totalAmount, 2, '.', '');
+            // Calcola total_paid: usa customTotalPaid se impostato, altrimenti 0 se free, altrimenti totalAmount
+            if ($this->customTotalPaid !== null) {
+                $totalPaid = number_format($this->customTotalPaid, 2, '.', '');
+            } elseif ($this->free) {
+                $totalPaid = '0.00';
+            } else {
+                $totalPaid = number_format($totalAmount, 2, '.', '');
+            }
 
             /** @var Order $order */
             $order = Order::create([
