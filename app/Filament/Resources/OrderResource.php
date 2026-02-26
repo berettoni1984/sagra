@@ -351,6 +351,7 @@ class OrderResource extends Resource
         return [
             'index' => Pages\ListOrders::route('/'),
             'create' => Pages\CreateOrder::route('/create'),
+            'quick-create' => Pages\QuickCreateOrder::route('/quick-create'),
             'view' => Pages\ViewOrder::route('/{record}'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),
             'print' => Pages\ViewPrintOrder::route('/{record}/print'),

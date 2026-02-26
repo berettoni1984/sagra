@@ -1,0 +1,275 @@
+<?php
+
+namespace App\Filament\Resources\OrderResource\Pages;
+
+use App\Filament\Resources\OrderResource;
+use App\Models\Config;
+use App\Models\Ingredient;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\Queue;
+use Filament\Actions\Action;
+use Filament\Forms;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Page;
+use Illuminate\Support\Facades\DB;
+
+class QuickCreateOrder extends Page
+{
+    protected static string $resource = OrderResource::class;
+
+    protected string $view = 'filament.resources.order-resource.pages.quick-create-order';
+
+    public ?int $queueId = null;
+
+    /** @var array<int, array{product_id: int, quantity: int, note: string|null}> */
+    public array $items = [];
+
+    public ?string $note = null;
+
+    public bool $free = false;
+
+    protected $listeners = ['create-order' => 'createOrder'];
+
+    public function mount(): void
+    {
+        $queues = Queue::whereIsDisabled(false)->get();
+
+        if ($queues->count() === 1) {
+            $this->queueId = $queues->first()?->id;
+        } else {
+            $defaultQueue = Queue::whereIsDisabled(false)->whereIsDefault(true)->first();
+            $this->queueId = $defaultQueue?->id;
+        }
+    }
+
+    public function updatedQueueId(): void
+    {
+        // Azzera il carrello quando si cambia coda
+        if (!empty($this->items)) {
+            Notification::make()
+                ->title(__('filament.Cart cleared'))
+                ->body(__('filament.Cart has been cleared due to queue change'))
+                ->warning()
+                ->send();
+        }
+
+        $this->items = [];
+        $this->note = null;
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('createOrder')
+                ->label(__('filament.Create Order - Alt + s'))
+                ->keyBindings(['alt+s'])
+                ->color('success')
+                ->icon('heroicon-o-check')
+                ->requiresConfirmation(fn () => empty($this->items))
+                ->modalHeading(__('filament.No items'))
+                ->modalDescription(__('filament.Are you sure you want to create an empty order?'))
+                ->action(fn () => $this->createOrder()),
+        ];
+    }
+
+    public function addProduct(int $productId): void
+    {
+        $found = false;
+        foreach ($this->items as $key => $item) {
+            if ($item['product_id'] === $productId) {
+                $this->items[$key]['quantity']++;
+                $found = true;
+                break;
+            }
+        }
+
+        if (!$found) {
+            $this->items[] = [
+                'product_id' => $productId,
+                'quantity' => 1,
+                'note' => null,
+            ];
+        }
+    }
+
+    public function removeProduct(int $index): void
+    {
+        unset($this->items[$index]);
+        $this->items = array_values($this->items);
+    }
+
+    public function increaseQuantity(int $index): void
+    {
+        if (isset($this->items[$index])) {
+            $this->items[$index]['quantity']++;
+        }
+    }
+
+    public function decreaseQuantity(int $index): void
+    {
+        if (isset($this->items[$index])) {
+            if ($this->items[$index]['quantity'] > 1) {
+                $this->items[$index]['quantity']--;
+            } else {
+                $this->removeProduct($index);
+            }
+        }
+    }
+
+    public function updateItemNote(int $index, ?string $note): void
+    {
+        if (isset($this->items[$index])) {
+            $this->items[$index]['note'] = $note;
+        }
+    }
+
+    public function splitItem(int $index): void
+    {
+        if (!isset($this->items[$index])) {
+            return;
+        }
+
+        // Se la quantità è 1, non possiamo dividere
+        if ($this->items[$index]['quantity'] <= 1) {
+            return;
+        }
+
+        // Sottrai 1 dalla quantità corrente
+        $this->items[$index]['quantity']--;
+
+        // Crea una nuova riga con 1 unità dello stesso prodotto
+        $newItem = [
+            'product_id' => $this->items[$index]['product_id'],
+            'quantity' => 1,
+            'note' => null, // Nuova riga senza nota
+        ];
+
+        // Inserisci la nuova riga subito dopo quella corrente
+        array_splice($this->items, $index + 1, 0, [$newItem]);
+    }
+
+    public function createOrder(): void
+    {
+        if (!$this->queueId) {
+            Notification::make()
+                ->title(__('filament.queue_label') . ' ' . __('filament.required'))
+                ->danger()
+                ->send();
+            return;
+        }
+
+        try {
+            DB::beginTransaction();
+
+            /** @var Queue|null $queue */
+            $queue = Queue::find($this->queueId);
+            if (!$queue) {
+                throw new \Exception('Queue not found');
+            }
+
+            $number = $queue->order_number;
+            $number++;
+            $queue->order_number = $number;
+            $queue->save();
+
+            $totalAmount = 0;
+            $orderItemsData = [];
+
+            foreach ($this->items as $item) {
+                /** @var Product|null $product */
+                $product = Product::find($item['product_id']);
+                if (!$product) {
+                    continue;
+                }
+
+                $rowAmount = ((float) $product->price) * $item['quantity'];
+                $totalAmount += $rowAmount;
+
+                $orderItemsData[] = [
+                    'product_id' => $product->id,
+                    'name' => $product->name,
+                    'quantity' => $item['quantity'],
+                    'amount' => $product->price,
+                    'row_amount' => $item['quantity']*$product->price,
+                    'note' => $item['note'],
+                ];
+
+                // Update stock
+                $product->stock -= $item['quantity'];
+                $product->save();
+
+                // Update ingredients stock
+                $product->ingredients->each(function (Ingredient $ingredient) use ($item) {
+                    if ($ingredient->is_disabled) {
+                        return;
+                    }
+                    $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
+                    $ingredient->stock -= ($item['quantity'] * $qty);
+                    $ingredient->save();
+                });
+            }
+
+            $totalPaid = $this->free ? '0.00' : number_format($totalAmount, 2, '.', '');
+
+            /** @var Order $order */
+            $order = Order::create([
+                'number' => $number,
+                'queue_id' => $this->queueId,
+                'user_id' => auth()->user()?->id,
+                'total_amount' => number_format($totalAmount, 2, '.', ''),
+                'total_paid' => $totalPaid,
+                'note' => $this->note,
+            ]);
+
+            foreach ($orderItemsData as $itemData) {
+                $order->orderItems()->create($itemData);
+            }
+
+            DB::commit();
+
+            Notification::make()
+                ->title(__('filament.Order created'))
+                ->success()
+                ->send();
+
+            $this->redirect(OrderResource::getUrl('print', ['record' => $order->id, 'print' => true]));
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            Notification::make()
+                ->title(__('filament.Error creating order'))
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function getProducts(): array
+    {
+        if (!$this->queueId) {
+            return [];
+        }
+
+        return Product::whereIsDisabled(false)
+            ->join('product_queue', 'products.id', '=', 'product_queue.product_id')
+            ->where('product_queue.queue_id', $this->queueId)
+            ->orderBy('products.order')
+            ->select('products.*')
+            ->get()
+            ->toArray();
+    }
+
+    public function getQueues(): array
+    {
+        return Queue::whereIsDisabled(false)
+            ->get()
+            ->map(fn ($queue) => [
+                'id' => $queue->id,
+                'label' => $queue->label,
+            ])
+            ->toArray();
+    }
+}
+

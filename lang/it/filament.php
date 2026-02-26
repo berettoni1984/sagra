@@ -96,5 +96,18 @@ return [
     'statistics' => 'Statistiche',
     'new_order' => 'Nuovo Ordine',
     'User: ' => 'Utente: ',
+    'Quick Create' => 'Creazione Rapida',
+    'Products' => 'Prodotti',
+    'Order Items' => 'Articoli Ordine',
+    'Create Order - Alt + s' => 'Crea Ordine - Alt + s',
+    'No items' => 'Nessun articolo',
+    'Are you sure you want to create an empty order?' => 'Sei sicuro di voler creare un ordine vuoto?',
+    'Order created' => 'Ordine creato',
+    'Error creating order' => 'Errore nella creazione dell\'ordine',
+    'required' => 'obbligatorio',
+    'This order contains out of stock items' => 'Questo ordine contiene articoli non disponibili a magazzino',
+    'Split item' => 'Dividi riga',
+    'Cart cleared' => 'Carrello svuotato',
+    'Cart has been cleared due to queue change' => 'Il carrello è stato svuotato a causa del cambio di coda',
 
 ];

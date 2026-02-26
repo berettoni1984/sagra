@@ -34,6 +34,11 @@ class ListOrders extends ListRecords
                     Actions\Exports\Enums\ExportFormat::Xlsx,
                     Actions\Exports\Enums\ExportFormat::Csv,
                 ]),
+            Actions\Action::make('quickCreate')
+                ->label(__('filament.Quick Create'))
+                ->icon('heroicon-o-bolt')
+                ->color('warning')
+                ->url(fn () => OrderResource::getUrl('quick-create')),
             Actions\CreateAction::make(),
 
         ];
