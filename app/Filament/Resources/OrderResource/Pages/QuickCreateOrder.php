@@ -3,13 +3,11 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
-use App\Models\Config;
 use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Queue;
 use Filament\Actions\Action;
-use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\DB;
@@ -48,7 +46,7 @@ class QuickCreateOrder extends Page
     public function updatedQueueId(): void
     {
         // Azzera il carrello quando si cambia coda
-        if (!empty($this->items)) {
+        if (! empty($this->items)) {
             Notification::make()
                 ->title(__('filament.Cart cleared'))
                 ->body(__('filament.Cart has been cleared due to queue change'))
@@ -86,7 +84,7 @@ class QuickCreateOrder extends Page
             }
         }
 
-        if (!$found) {
+        if (! $found) {
             $this->items[] = [
                 'product_id' => $productId,
                 'quantity' => 1,
@@ -128,7 +126,7 @@ class QuickCreateOrder extends Page
 
     public function splitItem(int $index): void
     {
-        if (!isset($this->items[$index])) {
+        if (! isset($this->items[$index])) {
             return;
         }
 
@@ -153,11 +151,12 @@ class QuickCreateOrder extends Page
 
     public function createOrder(): void
     {
-        if (!$this->queueId) {
+        if (! $this->queueId) {
             Notification::make()
-                ->title(__('filament.queue_label') . ' ' . __('filament.required'))
+                ->title(__('filament.queue_label').' '.__('filament.required'))
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -166,7 +165,7 @@ class QuickCreateOrder extends Page
 
             /** @var Queue|null $queue */
             $queue = Queue::find($this->queueId);
-            if (!$queue) {
+            if (! $queue) {
                 throw new \Exception('Queue not found');
             }
 
@@ -181,7 +180,7 @@ class QuickCreateOrder extends Page
             foreach ($this->items as $item) {
                 /** @var Product|null $product */
                 $product = Product::find($item['product_id']);
-                if (!$product) {
+                if (! $product) {
                     continue;
                 }
 
@@ -193,7 +192,7 @@ class QuickCreateOrder extends Page
                     'name' => $product->name,
                     'quantity' => $item['quantity'],
                     'amount' => $product->price,
-                    'row_amount' => $item['quantity']*$product->price,
+                    'row_amount' => $item['quantity'] * $product->price,
                     'note' => $item['note'],
                 ];
 
@@ -257,7 +256,7 @@ class QuickCreateOrder extends Page
 
     public function getProducts(): array
     {
-        if (!$this->queueId) {
+        if (! $this->queueId) {
             return [];
         }
 
@@ -281,4 +280,3 @@ class QuickCreateOrder extends Page
             ->toArray();
     }
 }
-

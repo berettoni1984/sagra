@@ -1,7 +1,9 @@
+@php use App\Models\Product; @endphp
 <x-filament-panels::page>
     <div class="space-y-6">
         {{-- Queue Selection --}}
-        <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+        <div
+            class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="fi-section-content p-6">
                 <div class="flex items-center gap-4">
                     <label class="text-sm font-medium text-gray-950 dark:text-white">
@@ -20,7 +22,8 @@
 
         {{-- Products Grid --}}
         @if($queueId)
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <div
+                class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
                 <div class="fi-section-header flex items-center gap-x-3 px-6 py-4">
                     <h3 class="fi-section-heading text-base font-semibold text-gray-950 dark:text-white">
                         {{ __('filament.Products') }}
@@ -32,39 +35,43 @@
                             @php
                                 // Calcola quantità totale del prodotto nel carrello
                                 $totalInCart = collect($items)->where('product_id', $product['id'])->sum('quantity');
+                                $isOutOfStock = !$product['backorder'] && $product['stock'] <= 0;
                             @endphp
                             <button
                                 type="button"
                                 wire:click="addProduct({{ $product['id'] }})"
                                 @class([
                                     'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all',
-                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => $product['stock'] > 0,
-                                    'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $product['stock'] <= 0,
+                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => !$isOutOfStock,
+                                    'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $isOutOfStock,
                                 ])
                             >
                                 @if($totalInCart > 0)
-                                    <span class="absolute top-1 left-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-success-600 rounded-full dark:bg-success-500">
+                                    <span
+                                        class="absolute top-1 left-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-success-600 rounded-full dark:bg-success-500">
                                         {{ $totalInCart }}
                                     </span>
                                 @endif
-                                @if($product['stock'] <= 0)
-                                    <span class="absolute top-1 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
+                                @if($isOutOfStock)
+                                    <span
+                                        class="absolute top-1 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
                                         ⚠️
                                     </span>
                                 @endif
-                                <span class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-2">
+                                <span
+                                    class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-2">
                                     {{ $product['name'] }}
                                 </span>
                                 <span class="text-sm text-gray-500 dark:text-gray-400 mt-2">
                                     € {{ number_format((float) $product['price'], 2, ',', '') }}
                                 </span>
-                                @if($product['stock'] > 0)
-                                    <span class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                        Stock: {{ $product['stock'] }}
-                                    </span>
-                                @else
+                                @if($isOutOfStock)
                                     <span class="text-xs text-red-600 dark:text-red-400 mt-1 font-bold uppercase">
                                         {{ __('filament.Out of Stock') }}
+                                    </span>
+                                @else
+                                    <span class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                        Stock: {{ $product['stock'] }}
                                     </span>
                                 @endif
                             </button>
@@ -76,7 +83,8 @@
 
         {{-- Order Items --}}
         @if(count($items) > 0)
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <div
+                class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
                 <div class="fi-section-header flex items-center gap-x-3 px-6 py-4">
                     <h3 class="fi-section-heading text-base font-semibold text-gray-950 dark:text-white">
                         {{ __('filament.Order Items') }} ({{ count($items) }})
@@ -86,9 +94,9 @@
                     <div class="space-y-2">
                         @foreach($items as $index => $item)
                             @php
-                                $product = \App\Models\Product::find($item['product_id']);
+                                $product = Product::find($item['product_id']);
                                 $rowTotal = $product ? ((float) $product->price) * $item['quantity'] : 0;
-                                $isOutOfStock = $product && $product->stock <= 0;
+                                $isOutOfStock = $product && !$product->backorder && $product->stock <= 0;
                             @endphp
                             <div @class([
                                 'flex flex-col gap-2 p-3 rounded-lg',
@@ -102,13 +110,15 @@
                                                 {{ $product->name ?? '' }}
                                             </div>
                                             @if($isOutOfStock)
-                                                <span class="inline-flex items-center px-2 py-0.5 text-xs font-bold text-red-700 bg-red-200 rounded-full dark:text-red-200 dark:bg-red-800 shrink-0">
+                                                <span
+                                                    class="inline-flex items-center px-2 py-0.5 text-xs font-bold text-red-700 bg-red-200 rounded-full dark:text-red-200 dark:bg-red-800 shrink-0">
                                                     ⚠️ {{ __('filament.Out of Stock') }}
                                                 </span>
                                             @endif
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-400">
-                                            € {{ number_format((float) ($product->price ?? 0), 2, ',', '') }} × {{ $item['quantity'] }}
+                                            € {{ number_format((float) ($product->price ?? 0), 2, ',', '') }}
+                                            × {{ $item['quantity'] }}
                                         </div>
                                     </div>
 
@@ -138,7 +148,8 @@
                                             />
                                         </button>
 
-                                        <span class="min-w-[2.5rem] text-center font-semibold text-gray-900 dark:text-white">
+                                        <span
+                                            class="min-w-[2.5rem] text-center font-semibold text-gray-900 dark:text-white">
                                             {{ $item['quantity'] }}
                                         </span>
 
@@ -154,7 +165,8 @@
                                         </button>
                                     </div>
 
-                                    <div class="font-semibold text-gray-900 dark:text-white min-w-[4rem] text-right shrink-0">
+                                    <div
+                                        class="font-semibold text-gray-900 dark:text-white min-w-[4rem] text-right shrink-0">
                                         € {{ number_format($rowTotal, 2, ',', '') }}
                                     </div>
 
@@ -188,8 +200,8 @@
                         @php
                             $hasOutOfStock = false;
                             foreach($items as $checkItem) {
-                                $product = \App\Models\Product::find($checkItem['product_id']);
-                                if ($product && $product->stock <= 0) {
+                                $product = Product::find($checkItem['product_id']);
+                                if ($product && !$product->backorder && $product->stock <= 0) {
                                     $hasOutOfStock = true;
                                     break;
                                 }
@@ -197,7 +209,8 @@
                         @endphp
 
                         @if($hasOutOfStock)
-                            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg dark:bg-yellow-950 dark:border-yellow-700">
+                            <div
+                                class="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg dark:bg-yellow-950 dark:border-yellow-700">
                                 <div class="flex items-center gap-2 text-sm">
                                     <span class="text-yellow-700 dark:text-yellow-300">⚠️</span>
                                     <span class="font-medium text-yellow-800 dark:text-yellow-200">
@@ -259,7 +272,7 @@
                             <span class="text-gray-900 dark:text-white">{{ __('filament.Total') }}</span>
                             <span class="text-gray-900 dark:text-white">
                                 € {{ number_format(collect($items)->sum(function($item) {
-                                    $product = \App\Models\Product::find($item['product_id']);
+                                    $product = Product::find($item['product_id']);
                                     return $product ? ((float) $product->price) * $item['quantity'] : 0;
                                 }), 2, ',', '') }}
                             </span>
