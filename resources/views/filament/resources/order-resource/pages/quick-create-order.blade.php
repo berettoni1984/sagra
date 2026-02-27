@@ -35,8 +35,40 @@
                             @php
                                 // Calcola quantità totale del prodotto nel carrello
                                 $totalInCart = collect($items)->where('product_id', $product['id'])->sum('quantity');
-                                $isOutOfStock = !$product['backorder'] && $product['stock'] <= 0;
                                 $productNumber = $index + 1; // Numerazione da 1 a n
+
+                                // Calcola lo stock rimanente considerando il carrello
+                                $remainingStock = $product['stock'] - $totalInCart;
+
+                                // Verifica se gli ingredienti sono sufficienti
+                                $ingredientsOutOfStock = false;
+                                if (!$product['backorder']) {
+                                    $productModel = \App\Models\Product::with('ingredients')->find($product['id']);
+                                    if ($productModel && $productModel->ingredients) {
+                                        foreach ($productModel->ingredients as $ingredient) {
+                                            if ($ingredient->is_disabled) {
+                                                continue;
+                                            }
+                                            $qtyNeeded = $ingredient->pivot?->qty ?? 0;
+                                            $totalIngredientUsed = collect($items)->sum(function($item) use ($ingredient) {
+                                                $p = \App\Models\Product::with('ingredients')->find($item['product_id']);
+                                                if (!$p) return 0;
+                                                $ing = $p->ingredients->firstWhere('id', $ingredient->id);
+                                                if (!$ing || $ing->is_disabled) return 0;
+                                                return ($ing->pivot?->qty ?? 0) * $item['quantity'];
+                                            });
+                                            $remainingIngredientStock = $ingredient->stock - $totalIngredientUsed;
+                                            if ($remainingIngredientStock < 0) {
+                                                $ingredientsOutOfStock = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Il prodotto è fuori stock se:
+                                // - Non ha backorder E (stock rimanente < 0 O ingredienti insufficienti)
+                                $isOutOfStock = !$product['backorder'] && ($remainingStock < 0 || $ingredientsOutOfStock);
                             @endphp
                             <button
                                 type="button"
@@ -78,11 +110,15 @@
                                 </span>
                                 @if($isOutOfStock)
                                     <span class="text-xs text-red-600 dark:text-red-400 mt-1 font-bold uppercase">
-                                        {{ __('filament.Out of Stock') }}
+                                        @if($ingredientsOutOfStock)
+                                            {{ __('filament.Ingredient Out of Stock') }}
+                                        @else
+                                            {{ __('filament.Out of Stock') }}
+                                        @endif
                                     </span>
                                 @else
-                                    <span class="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                        Stock: {{ $product['stock'] }}
+                                    <span class="text-xs mt-1 @if($remainingStock < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
+                                        Stock: {{ $remainingStock }}
                                     </span>
                                 @endif
                             </button>
@@ -130,8 +166,35 @@
                                 $index = $sortedItem['originalIndex'];
                                 $product = Product::find($item['product_id']);
                                 $rowTotal = $product ? ((float) $product->price) * $item['quantity'] : 0;
-                                $isOutOfStock = $product && !$product->backorder && $product->stock <= 0;
                                 $productNumber = $productNumbers[$item['product_id']] ?? '?';
+
+                                // Calcola stock dinamico
+                                $totalInCartForProduct = collect($items)->where('product_id', $item['product_id'])->sum('quantity');
+                                $remainingStockForProduct = $product ? $product->stock - $totalInCartForProduct : 0;
+
+                                // Verifica ingredienti
+                                $ingredientsOutOfStockForItem = false;
+                                if ($product && !$product->backorder && $product->ingredients) {
+                                    foreach ($product->ingredients as $ingredient) {
+                                        if ($ingredient->is_disabled) {
+                                            continue;
+                                        }
+                                        $qtyNeeded = $ingredient->pivot?->qty ?? 0;
+                                        $totalIngredientUsed = collect($items)->sum(function($cartItem) use ($ingredient) {
+                                            $p = Product::with('ingredients')->find($cartItem['product_id']);
+                                            if (!$p) return 0;
+                                            $ing = $p->ingredients->firstWhere('id', $ingredient->id);
+                                            if (!$ing || $ing->is_disabled) return 0;
+                                            return ($ing->pivot?->qty ?? 0) * $cartItem['quantity'];
+                                        });
+                                        if ($ingredient->stock - $totalIngredientUsed < 0) {
+                                            $ingredientsOutOfStockForItem = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                $isOutOfStock = $product && !$product->backorder && ($remainingStockForProduct < 0 || $ingredientsOutOfStockForItem);
                             @endphp
                             <div @class([
                                 'flex flex-col gap-2 p-3 rounded-lg',
@@ -240,10 +303,38 @@
                         @php
                             $hasOutOfStock = false;
                             foreach($items as $checkItem) {
-                                $product = Product::find($checkItem['product_id']);
-                                if ($product && !$product->backorder && $product->stock <= 0) {
+                                $product = Product::with('ingredients')->find($checkItem['product_id']);
+                                if (!$product || $product->backorder) {
+                                    continue;
+                                }
+
+                                // Verifica stock prodotto
+                                $totalInCartForProduct = collect($items)->where('product_id', $checkItem['product_id'])->sum('quantity');
+                                $remainingStockForProduct = $product->stock - $totalInCartForProduct;
+
+                                if ($remainingStockForProduct < 0) {
                                     $hasOutOfStock = true;
                                     break;
+                                }
+
+                                // Verifica ingredienti
+                                if ($product->ingredients) {
+                                    foreach ($product->ingredients as $ingredient) {
+                                        if ($ingredient->is_disabled) {
+                                            continue;
+                                        }
+                                        $totalIngredientUsed = collect($items)->sum(function($cartItem) use ($ingredient) {
+                                            $p = Product::with('ingredients')->find($cartItem['product_id']);
+                                            if (!$p) return 0;
+                                            $ing = $p->ingredients->firstWhere('id', $ingredient->id);
+                                            if (!$ing || $ing->is_disabled) return 0;
+                                            return ($ing->pivot?->qty ?? 0) * $cartItem['quantity'];
+                                        });
+                                        if ($ingredient->stock - $totalIngredientUsed < 0) {
+                                            $hasOutOfStock = true;
+                                            break 2; // Esce da entrambi i cicli
+                                        }
+                                    }
                                 }
                             }
                         @endphp

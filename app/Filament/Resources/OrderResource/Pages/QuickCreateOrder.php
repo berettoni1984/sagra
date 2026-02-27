@@ -11,6 +11,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class QuickCreateOrder extends Page
 {
@@ -29,6 +30,9 @@ class QuickCreateOrder extends Page
 
     public ?float $customTotalPaid = null;
 
+    /**
+     * @var array<string, string>
+     */
     protected $listeners = ['create-order' => 'createOrder'];
 
     public function mount(): void
@@ -37,10 +41,12 @@ class QuickCreateOrder extends Page
 
         if ($queues->count() === 1) {
             $this->queueId = $queues->first()?->id;
-        } else {
-            $defaultQueue = Queue::whereIsDisabled(false)->whereIsDefault(true)->first();
-            $this->queueId = $defaultQueue?->id;
+
+            return;
         }
+        $defaultQueue = Queue::whereIsDisabled(false)->whereIsDefault(true)->first();
+        $this->queueId = $defaultQueue?->id;
+
     }
 
     public function updatedQueueId(): void
@@ -56,6 +62,19 @@ class QuickCreateOrder extends Page
 
         $this->items = [];
         $this->note = null;
+    }
+
+    public function getPaid(float|int $totalAmount): string
+    {
+        if ($this->customTotalPaid !== null) {
+            return number_format($this->customTotalPaid, 2, '.', '');
+        }
+        if ($this->free) {
+            return '0.00';
+        }
+
+        return number_format($totalAmount, 2, '.', '');
+
     }
 
     protected function getHeaderActions(): array
@@ -116,13 +135,16 @@ class QuickCreateOrder extends Page
 
     public function decreaseQuantity(int $index): void
     {
-        if (isset($this->items[$index])) {
-            if ($this->items[$index]['quantity'] > 1) {
-                $this->items[$index]['quantity']--;
-            } else {
-                $this->removeProduct($index);
-            }
+        if (! isset($this->items[$index])) {
+            return;
         }
+        if ($this->items[$index]['quantity'] > 1) {
+            $this->items[$index]['quantity']--;
+
+            return;
+        }
+        $this->removeProduct($index);
+
     }
 
     public function updateItemNote(int $index, ?string $note): void
@@ -174,7 +196,7 @@ class QuickCreateOrder extends Page
             /** @var Queue|null $queue */
             $queue = Queue::find($this->queueId);
             if (! $queue) {
-                throw new \RuntimeException('Queue not found');
+                throw new RuntimeException('Queue not found');
             }
 
             $number = $queue->order_number;
@@ -200,7 +222,7 @@ class QuickCreateOrder extends Page
                     'name' => $product->name,
                     'quantity' => $item['quantity'],
                     'amount' => $product->price,
-                    'row_amount' => $item['quantity'] * $product->price,
+                    'row_amount' => $item['quantity'] * ((float) $product->price),
                     'note' => $item['note'],
                 ];
 
@@ -220,13 +242,7 @@ class QuickCreateOrder extends Page
             }
 
             // Calcola total_paid: usa customTotalPaid se impostato, altrimenti 0 se free, altrimenti totalAmount
-            if ($this->customTotalPaid !== null) {
-                $totalPaid = number_format($this->customTotalPaid, 2, '.', '');
-            } elseif ($this->free) {
-                $totalPaid = '0.00';
-            } else {
-                $totalPaid = number_format($totalAmount, 2, '.', '');
-            }
+            $totalPaid = $this->getPaid($totalAmount);
 
             /** @var Order $order */
             $order = Order::create([
@@ -262,6 +278,9 @@ class QuickCreateOrder extends Page
         }
     }
 
+    /**
+     * @return array<int, Product>
+     */
     public function getProducts(): array
     {
         if (! $this->queueId) {
@@ -277,6 +296,9 @@ class QuickCreateOrder extends Page
             ->toArray();
     }
 
+    /**
+     * @return array<int, array{id: int, label: string}>
+     */
     public function getQueues(): array
     {
         return Queue::whereIsDisabled(false)

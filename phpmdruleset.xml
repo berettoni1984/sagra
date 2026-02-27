@@ -9,6 +9,9 @@
         First basic ruleset for code analysis...
     </description>
 
+    <!-- Exclude storage directory -->
+    <exclude-pattern>*/storage/*</exclude-pattern>
+
     <!-- Import all rule sets -->
     <rule ref="rulesets/cleancode.xml">
         <exclude name="StaticAccess"/>
