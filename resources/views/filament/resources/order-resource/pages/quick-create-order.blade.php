@@ -341,6 +341,27 @@
                 </div>
             </div>
         @endif
+
+        {{-- Fixed Create Order Button --}}
+        @if(count($items) > 0)
+            <div class="fixed bottom-6 right-6 z-50">
+                <button
+                    type="button"
+                    wire:click="$dispatch('create-order')"
+                    class="relative flex items-center justify-center w-16 h-16 rounded-full bg-success-600 hover:bg-success-700 text-white font-bold transition-all shadow-2xl hover:shadow-3xl hover:scale-110 ring-4 ring-success-200 dark:ring-success-900"
+                    title="{{ __('filament.Create Order') }}"
+                >
+                    <x-filament::icon
+                        icon="heroicon-o-shopping-cart"
+                        class="h-8 w-8"
+                    />
+                    {{-- Badge con quantità totale prodotti --}}
+                    <span class="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white bg-primary-600 rounded-full border-2 border-white dark:border-gray-900">
+                        {{ collect($items)->sum('quantity') }}
+                    </span>
+                </button>
+            </div>
+        @endif
     </div>
 </x-filament-panels::page>
 
