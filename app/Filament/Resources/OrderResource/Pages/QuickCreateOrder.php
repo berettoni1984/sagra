@@ -62,13 +62,21 @@ class QuickCreateOrder extends Page
     {
         return [
             Action::make('createOrder')
-                ->label(__('filament.Create Order - Alt + s'))
+                ->label(__('filament.Create Order'))
                 ->keyBindings(['alt+s'])
                 ->color('success')
                 ->icon('heroicon-o-check')
-                ->requiresConfirmation(fn () => empty($this->items))
+                ->requiresConfirmation()
                 ->modalHeading(__('filament.No items'))
                 ->modalDescription(__('filament.Are you sure you want to create an empty order?'))
+                ->hidden(fn () => !empty($this->items))
+                ->visible(fn () => empty($this->items))
+                ->action(fn () => $this->createOrder()),
+            Action::make('createOrderDirect')
+                ->label(__('filament.Create Order'))
+                ->color('success')
+                ->icon('heroicon-o-check')
+                ->visible(fn () => !empty($this->items))
                 ->action(fn () => $this->createOrder()),
         ];
     }
@@ -166,7 +174,7 @@ class QuickCreateOrder extends Page
             /** @var Queue|null $queue */
             $queue = Queue::find($this->queueId);
             if (! $queue) {
-                throw new \Exception('Queue not found');
+                throw new \RuntimeException('Queue not found');
             }
 
             $number = $queue->order_number;

@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Resources\OrderResource;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -48,7 +49,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationItems([
                 NavigationItem::make()
                     ->label(__('filament.new_order'))
-                    ->url('/orders/create')
+                    ->url(fn () => OrderResource::getUrl('quick-create'))
                     ->group(__('filament.work'))
                     ->sort(2)
                     ->icon('heroicon-o-shopping-cart'),

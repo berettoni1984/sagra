@@ -100,6 +100,7 @@ return [
     'Products' => 'Prodotti',
     'Order Items' => 'Articoli Ordine',
     'Create Order - Alt + s' => 'Crea Ordine - Alt + s',
+    'Create Order' => 'Crea Ordine',
     'No items' => 'Nessun articolo',
     'Are you sure you want to create an empty order?' => 'Sei sicuro di voler creare un ordine vuoto?',
     'Order created' => 'Ordine creato',

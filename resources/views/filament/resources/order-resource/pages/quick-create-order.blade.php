@@ -292,7 +292,7 @@
                                     icon="heroicon-o-check-circle"
                                     class="h-6 w-6"
                                 />
-                                <span>{{ __('filament.Create Order - Alt + s') }}</span>
+                                <span>{{ __('filament.Create Order') }}</span>
                             </button>
                         </div>
                     </div>

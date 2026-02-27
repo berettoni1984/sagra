@@ -22,11 +22,11 @@ class ViewPrintOrder extends ViewRecord
                 ->label(__('filament.Print'))
                 ->url(fn () => OrderResource::getUrl('print', ['record' => $this->record, 'print' => true]))
                 ->icon('heroicon-o-printer'),
-            Actions\CreateAction::make('new_order')
-                ->label(__('filament.New - Alt + s'))
-                ->keyBindings(['alt+s'])
-                ->url(fn () => OrderResource::getUrl('create'))
-                ->icon('heroicon-o-plus-circle'),
+            Actions\CreateAction::make('quickCreate')
+                ->label(__('filament.Quick Create'))
+                ->icon('heroicon-o-bolt')
+                ->color('warning')
+                ->url(fn () => OrderResource::getUrl('quick-create')),
 
         ];
     }
