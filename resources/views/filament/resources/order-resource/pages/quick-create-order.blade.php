@@ -36,6 +36,7 @@
                                 // Calcola quantità totale del prodotto nel carrello
                                 $totalInCart = collect($items)->where('product_id', $product['id'])->sum('quantity');
                                 $isOutOfStock = !$product['backorder'] && $product['stock'] <= 0;
+                                $productNumber = $index + 1; // Numerazione da 1 a n
                             @endphp
                             <button
                                 type="button"
@@ -46,20 +47,30 @@
                                     'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $isOutOfStock,
                                 ])
                             >
+                                {{-- Numerazione prodotto --}}
+                                <span
+                                    class="absolute top-1 left-1 flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-gray-700 bg-gray-200 rounded dark:text-gray-300 dark:bg-gray-700">
+                                    {{ $productNumber }}
+                                </span>
+
+                                {{-- Quantità nel carrello --}}
                                 @if($totalInCart > 0)
                                     <span
-                                        class="absolute top-1 left-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-success-600 rounded-full dark:bg-success-500">
+                                        class="absolute top-1 right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-success-600 rounded-full dark:bg-success-500">
                                         {{ $totalInCart }}
                                     </span>
                                 @endif
+
+                                {{-- Warning fuori stock --}}
                                 @if($isOutOfStock)
                                     <span
-                                        class="absolute top-1 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
+                                        class="absolute top-8 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
                                         ⚠️
                                     </span>
                                 @endif
+
                                 <span
-                                    class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-2">
+                                    class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-2 mt-2">
                                     {{ $product['name'] }}
                                 </span>
                                 <span class="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -92,11 +103,35 @@
                 </div>
                 <div class="fi-section-content p-6">
                     <div class="space-y-2">
-                        @foreach($items as $index => $item)
+                        @php
+                            // Crea una mappa product_id => numero prodotto
+                            $productNumbers = [];
+                            foreach($this->getProducts() as $idx => $prod) {
+                                $productNumbers[$prod['id']] = $idx + 1;
+                            }
+
+                            // Ordina gli item secondo l'ordine dei prodotti visualizzati, mantenendo l'indice originale
+                            $sortedItems = collect($items)
+                                ->map(function($item, $originalIndex) use ($productNumbers) {
+                                    return [
+                                        'item' => $item,
+                                        'originalIndex' => $originalIndex,
+                                        'sortOrder' => $productNumbers[$item['product_id']] ?? 999,
+                                    ];
+                                })
+                                ->sortBy('sortOrder')
+                                ->values()
+                                ->all();
+                        @endphp
+
+                        @foreach($sortedItems as $sortedItem)
                             @php
+                                $item = $sortedItem['item'];
+                                $index = $sortedItem['originalIndex'];
                                 $product = Product::find($item['product_id']);
                                 $rowTotal = $product ? ((float) $product->price) * $item['quantity'] : 0;
                                 $isOutOfStock = $product && !$product->backorder && $product->stock <= 0;
+                                $productNumber = $productNumbers[$item['product_id']] ?? '?';
                             @endphp
                             <div @class([
                                 'flex flex-col gap-2 p-3 rounded-lg',
@@ -104,6 +139,11 @@
                                 'bg-red-50 border-2 border-red-300 dark:bg-red-950 dark:border-red-700' => $isOutOfStock,
                             ])>
                                 <div class="flex items-center gap-3">
+                                    {{-- Numero prodotto --}}
+                                    <div class="flex items-center justify-center min-w-[2rem] h-8 px-2 text-sm font-bold text-gray-700 bg-gray-200 rounded dark:text-gray-300 dark:bg-gray-700 shrink-0">
+                                        {{ $productNumber }}
+                                    </div>
+
                                     <div class="flex-1 min-w-0">
                                         <div class="flex items-center gap-2">
                                             <div class="font-medium text-gray-900 dark:text-white truncate">

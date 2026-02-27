@@ -69,14 +69,14 @@ class QuickCreateOrder extends Page
                 ->requiresConfirmation()
                 ->modalHeading(__('filament.No items'))
                 ->modalDescription(__('filament.Are you sure you want to create an empty order?'))
-                ->hidden(fn () => !empty($this->items))
+                ->hidden(fn () => ! empty($this->items))
                 ->visible(fn () => empty($this->items))
                 ->action(fn () => $this->createOrder()),
             Action::make('createOrderDirect')
                 ->label(__('filament.Create Order'))
                 ->color('success')
                 ->icon('heroicon-o-check')
-                ->visible(fn () => !empty($this->items))
+                ->visible(fn () => ! empty($this->items))
                 ->action(fn () => $this->createOrder()),
         ];
     }
