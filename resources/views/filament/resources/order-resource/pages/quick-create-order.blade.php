@@ -1,4 +1,3 @@
-@php use App\Models\Product; @endphp
 <x-filament-panels::page>
     <div class="space-y-6">
         {{-- Queue Selection --}}
@@ -31,70 +30,32 @@
                 </div>
                 <div class="fi-section-content p-6">
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                        @foreach($this->getProducts() as $index => $product)
-                            @php
-                                // Calcola quantità totale del prodotto nel carrello
-                                $totalInCart = collect($items)->where('product_id', $product['id'])->sum('quantity');
-                                $productNumber = $index + 1; // Numerazione da 1 a n
-
-                                // Calcola lo stock rimanente considerando il carrello
-                                $remainingStock = $product['stock'] - $totalInCart;
-
-                                // Verifica se gli ingredienti sono sufficienti
-                                $ingredientsOutOfStock = false;
-                                if (!$product['backorder']) {
-                                    $productModel = \App\Models\Product::with('ingredients')->find($product['id']);
-                                    if ($productModel && $productModel->ingredients) {
-                                        foreach ($productModel->ingredients as $ingredient) {
-                                            if ($ingredient->is_disabled) {
-                                                continue;
-                                            }
-                                            $qtyNeeded = $ingredient->pivot?->qty ?? 0;
-                                            $totalIngredientUsed = collect($items)->sum(function($item) use ($ingredient) {
-                                                $p = \App\Models\Product::with('ingredients')->find($item['product_id']);
-                                                if (!$p) return 0;
-                                                $ing = $p->ingredients->firstWhere('id', $ingredient->id);
-                                                if (!$ing || $ing->is_disabled) return 0;
-                                                return ($ing->pivot?->qty ?? 0) * $item['quantity'];
-                                            });
-                                            $remainingIngredientStock = $ingredient->stock - $totalIngredientUsed;
-                                            if ($remainingIngredientStock < 0) {
-                                                $ingredientsOutOfStock = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Il prodotto è fuori stock se:
-                                // - Non ha backorder E (stock rimanente < 0 O ingredienti insufficienti)
-                                $isOutOfStock = !$product['backorder'] && ($remainingStock < 0 || $ingredientsOutOfStock);
-                            @endphp
+                        @foreach($this->getProducts() as $product)
                             <button
                                 type="button"
                                 wire:click="addProduct({{ $product['id'] }})"
                                 @class([
                                     'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all',
-                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => !$isOutOfStock,
-                                    'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $isOutOfStock,
+                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => !$product['is_out_of_stock'],
+                                    'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $product['is_out_of_stock'],
                                 ])
                             >
                                 {{-- Numerazione prodotto --}}
                                 <span
                                     class="absolute top-1 left-1 flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-gray-700 bg-gray-200 rounded dark:text-gray-300 dark:bg-gray-700">
-                                    {{ $productNumber }}
+                                    {{ $product['number'] }}
                                 </span>
 
                                 {{-- Quantità nel carrello --}}
-                                @if($totalInCart > 0)
+                                @if($product['total_in_cart'] > 0)
                                     <span
                                         class="absolute top-1 right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-success-600 rounded-full dark:bg-success-500">
-                                        {{ $totalInCart }}
+                                        {{ $product['total_in_cart'] }}
                                     </span>
                                 @endif
 
                                 {{-- Warning fuori stock --}}
-                                @if($isOutOfStock)
+                                @if($product['is_out_of_stock'])
                                     <span
                                         class="absolute top-8 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
                                         ⚠️
@@ -108,17 +69,17 @@
                                 <span class="text-sm text-gray-500 dark:text-gray-400 mt-2">
                                     € {{ number_format((float) $product['price'], 2, ',', '') }}
                                 </span>
-                                @if($isOutOfStock)
+                                @if($product['is_out_of_stock'])
                                     <span class="text-xs text-red-600 dark:text-red-400 mt-1 font-bold uppercase">
-                                        @if($ingredientsOutOfStock)
+                                        @if($product['has_insufficient_ingredients'])
                                             {{ __('filament.Ingredient Out of Stock') }}
                                         @else
                                             {{ __('filament.Out of Stock') }}
                                         @endif
                                     </span>
                                 @else
-                                    <span class="text-xs mt-1 @if($remainingStock < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
-                                        Stock: {{ $remainingStock }}
+                                    <span class="text-xs mt-1 @if($product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
+                                        Stock: {{ $product['remaining_stock'] }}
                                     </span>
                                 @endif
                             </button>
@@ -139,62 +100,14 @@
                 </div>
                 <div class="fi-section-content p-6">
                     <div class="space-y-2">
-                        @php
-                            // Crea una mappa product_id => numero prodotto
-                            $productNumbers = [];
-                            foreach($this->getProducts() as $idx => $prod) {
-                                $productNumbers[$prod['id']] = $idx + 1;
-                            }
-
-                            // Ordina gli item secondo l'ordine dei prodotti visualizzati, mantenendo l'indice originale
-                            $sortedItems = collect($items)
-                                ->map(function($item, $originalIndex) use ($productNumbers) {
-                                    return [
-                                        'item' => $item,
-                                        'originalIndex' => $originalIndex,
-                                        'sortOrder' => $productNumbers[$item['product_id']] ?? 999,
-                                    ];
-                                })
-                                ->sortBy('sortOrder')
-                                ->values()
-                                ->all();
-                        @endphp
-
-                        @foreach($sortedItems as $sortedItem)
+                        @foreach($this->getSortedEnrichedItems() as $enrichedItem)
                             @php
-                                $item = $sortedItem['item'];
-                                $index = $sortedItem['originalIndex'];
-                                $product = Product::find($item['product_id']);
-                                $rowTotal = $product ? ((float) $product->price) * $item['quantity'] : 0;
-                                $productNumber = $productNumbers[$item['product_id']] ?? '?';
-
-                                // Calcola stock dinamico
-                                $totalInCartForProduct = collect($items)->where('product_id', $item['product_id'])->sum('quantity');
-                                $remainingStockForProduct = $product ? $product->stock - $totalInCartForProduct : 0;
-
-                                // Verifica ingredienti
-                                $ingredientsOutOfStockForItem = false;
-                                if ($product && !$product->backorder && $product->ingredients) {
-                                    foreach ($product->ingredients as $ingredient) {
-                                        if ($ingredient->is_disabled) {
-                                            continue;
-                                        }
-                                        $qtyNeeded = $ingredient->pivot?->qty ?? 0;
-                                        $totalIngredientUsed = collect($items)->sum(function($cartItem) use ($ingredient) {
-                                            $p = Product::with('ingredients')->find($cartItem['product_id']);
-                                            if (!$p) return 0;
-                                            $ing = $p->ingredients->firstWhere('id', $ingredient->id);
-                                            if (!$ing || $ing->is_disabled) return 0;
-                                            return ($ing->pivot?->qty ?? 0) * $cartItem['quantity'];
-                                        });
-                                        if ($ingredient->stock - $totalIngredientUsed < 0) {
-                                            $ingredientsOutOfStockForItem = true;
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                $isOutOfStock = $product && !$product->backorder && ($remainingStockForProduct < 0 || $ingredientsOutOfStockForItem);
+                                $item = $enrichedItem['item'];
+                                $index = $enrichedItem['original_index'];
+                                $product = $enrichedItem['product'];
+                                $rowTotal = $enrichedItem['row_total'];
+                                $productNumber = $enrichedItem['product_number'];
+                                $isOutOfStock = $enrichedItem['is_out_of_stock'];
                             @endphp
                             <div @class([
                                 'flex flex-col gap-2 p-3 rounded-lg',
@@ -300,46 +213,7 @@
 
                     {{-- Order Total --}}
                     <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                        @php
-                            $hasOutOfStock = false;
-                            foreach($items as $checkItem) {
-                                $product = Product::with('ingredients')->find($checkItem['product_id']);
-                                if (!$product || $product->backorder) {
-                                    continue;
-                                }
-
-                                // Verifica stock prodotto
-                                $totalInCartForProduct = collect($items)->where('product_id', $checkItem['product_id'])->sum('quantity');
-                                $remainingStockForProduct = $product->stock - $totalInCartForProduct;
-
-                                if ($remainingStockForProduct < 0) {
-                                    $hasOutOfStock = true;
-                                    break;
-                                }
-
-                                // Verifica ingredienti
-                                if ($product->ingredients) {
-                                    foreach ($product->ingredients as $ingredient) {
-                                        if ($ingredient->is_disabled) {
-                                            continue;
-                                        }
-                                        $totalIngredientUsed = collect($items)->sum(function($cartItem) use ($ingredient) {
-                                            $p = Product::with('ingredients')->find($cartItem['product_id']);
-                                            if (!$p) return 0;
-                                            $ing = $p->ingredients->firstWhere('id', $ingredient->id);
-                                            if (!$ing || $ing->is_disabled) return 0;
-                                            return ($ing->pivot?->qty ?? 0) * $cartItem['quantity'];
-                                        });
-                                        if ($ingredient->stock - $totalIngredientUsed < 0) {
-                                            $hasOutOfStock = true;
-                                            break 2; // Esce da entrambi i cicli
-                                        }
-                                    }
-                                }
-                            }
-                        @endphp
-
-                        @if($hasOutOfStock)
+                        @if($this->hasOutOfStockItems())
                             <div
                                 class="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg dark:bg-yellow-950 dark:border-yellow-700">
                                 <div class="flex items-center gap-2 text-sm">
@@ -364,7 +238,7 @@
                             ></textarea>
                         </div>
 
-                        @if(\App\Models\Config::whereCode('free')->first()?->config_value)
+                        @if($this->isFreeConfigEnabled())
                             <div class="flex items-center gap-3 mb-4">
                                 <input
                                     type="checkbox"
@@ -402,10 +276,7 @@
                         <div class="flex justify-between items-center text-xl font-bold">
                             <span class="text-gray-900 dark:text-white">{{ __('filament.Total') }}</span>
                             <span class="text-gray-900 dark:text-white">
-                                € {{ number_format(collect($items)->sum(function($item) {
-                                    $product = Product::find($item['product_id']);
-                                    return $product ? ((float) $product->price) * $item['quantity'] : 0;
-                                }), 2, ',', '') }}
+                                € {{ number_format($this->getOrderTotal(), 2, ',', '') }}
                             </span>
                         </div>
 
@@ -448,7 +319,7 @@
                     />
                     {{-- Badge con quantità totale prodotti --}}
                     <span class="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.5rem] h-6 px-1.5 text-xs font-bold text-white bg-primary-600 rounded-full border-2 border-white dark:border-gray-900">
-                        {{ collect($items)->sum('quantity') }}
+                        {{ $this->getTotalItemsCount() }}
                     </span>
                 </button>
             </div>
