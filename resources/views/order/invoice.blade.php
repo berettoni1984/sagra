@@ -108,7 +108,11 @@
             font-size: 9pt;
             font-style: italic;
             padding: 2mm !important;
-            border-top: 1px dashed #666;
+            border-top: none !important;
+        }
+
+        .has-note {
+            border-bottom: none !important;
         }
 
         .footer-label {
@@ -163,17 +167,17 @@
             <tbody>
             @foreach ($order->orderItems as $item)
                 <tr>
-                    <td class="item-name" @if($item->note && $type==='Cucina') rowspan="2" @endif>{{ $item->name }}</td>
-                    <td class="item-qty">{{ $item->quantity }}</td>
-                    <td class="item-total">{{ $item->row_amount }} €</td>
+                    <td class="item-name @if($item->note) has-note @endif">{{ $item->name }}</td>
+                    <td class="item-qty @if($item->note) has-note @endif">{{ $item->quantity }}</td>
+                    <td class="item-total @if($item->note) has-note @endif">{{ $item->row_amount }} €</td>
                 </tr>
-                @if($item->note && $type==='Cucina')
+                @if($item->note)
                     <tr>
-                        <td class="note-row" colspan="2"><strong>Nota:</strong> {{ $item->note }}</td>
+                        <td class="note-row" colspan="3"><strong>Nota:</strong> {{ $item->note }}</td>
                     </tr>
                 @endif
             @endforeach
-            @if($order->note && $type==='Cucina')
+            @if($order->note)
                 <tr>
                     <td class="note-header" colspan="3">Note Ordine</td>
                 </tr>

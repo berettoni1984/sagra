@@ -7,6 +7,7 @@ use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Queue;
+use App\Services\OrderManagementService;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -21,7 +22,7 @@ class QuickCreateOrder extends Page
 
     public ?int $queueId = null;
 
-    /** @var array<int, array{product_id: int, quantity: int, note: string|null}> */
+    /** @var array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}> */
     public array $items = [];
 
     public ?string $note = null;
@@ -29,6 +30,13 @@ class QuickCreateOrder extends Page
     public bool $free = false;
 
     public ?float $customTotalPaid = null;
+
+    private OrderManagementService $orderService;
+
+    public function boot(OrderManagementService $orderService): void
+    {
+        $this->orderService = $orderService;
+    }
 
     /**
      * @var array<string, string>
@@ -102,49 +110,22 @@ class QuickCreateOrder extends Page
 
     public function addProduct(int $productId): void
     {
-        $found = false;
-        foreach ($this->items as $key => $item) {
-            if ($item['product_id'] === $productId) {
-                $this->items[$key]['quantity']++;
-                $found = true;
-                break;
-            }
-        }
-
-        if (! $found) {
-            $this->items[] = [
-                'product_id' => $productId,
-                'quantity' => 1,
-                'note' => null,
-            ];
-        }
+        $this->items = $this->orderService->addProduct($this->items, $productId);
     }
 
     public function removeProduct(int $index): void
     {
-        unset($this->items[$index]);
-        $this->items = array_values($this->items);
+        $this->items = $this->orderService->removeProduct($this->items, $index);
     }
 
     public function increaseQuantity(int $index): void
     {
-        if (isset($this->items[$index])) {
-            $this->items[$index]['quantity']++;
-        }
+        $this->items = $this->orderService->increaseQuantity($this->items, $index);
     }
 
     public function decreaseQuantity(int $index): void
     {
-        if (! isset($this->items[$index])) {
-            return;
-        }
-        if ($this->items[$index]['quantity'] > 1) {
-            $this->items[$index]['quantity']--;
-
-            return;
-        }
-        $this->removeProduct($index);
-
+        $this->items = $this->orderService->decreaseQuantity($this->items, $index);
     }
 
     public function updateItemNote(int $index, ?string $note): void
@@ -156,24 +137,7 @@ class QuickCreateOrder extends Page
 
     public function splitItem(int $index): void
     {
-        if (! isset($this->items[$index])) {
-            return;
-        }
-
-        // Se la quantità è 1, non possiamo dividere
-        if ($this->items[$index]['quantity'] <= 1) {
-            return;
-        }
-
-        // Sottrai 1 dalla quantità corrente
-        $this->items[$index]['quantity']--;
-
-        // Crea una nuova riga con 1 unità dello stesso prodotto
-        $this->items[] = [
-            'product_id' => $this->items[$index]['product_id'],
-            'quantity' => 1,
-            'note' => null,
-        ];
+        $this->items = $this->orderService->splitItem($this->items, $index);
     }
 
     public function createOrder(): void
@@ -276,121 +240,6 @@ class QuickCreateOrder extends Page
     }
 
     /**
-     * Calcola il totale di un ingrediente usato nel carrello
-     */
-    protected function getTotalIngredientUsedInCart(int $ingredientId): float
-    {
-        $total = 0;
-        foreach ($this->items as $item) {
-            $product = Product::with('ingredients')->find($item['product_id']);
-            if (! $product) {
-                continue;
-            }
-            $ingredient = $product->ingredients->firstWhere('id', $ingredientId);
-            if (! $ingredient || $ingredient->is_disabled) {
-                continue;
-            }
-            $qtyNeeded = $ingredient->pivot?->qty ?? 0;
-            $total += $qtyNeeded * $item['quantity'];
-        }
-
-        return $total;
-    }
-
-    /**
-     * Verifica se un prodotto ha ingredienti insufficienti considerando il carrello
-     */
-    protected function hasInsufficientIngredients(Product $product): bool
-    {
-        if ($product->backorder) {
-            return false;
-        }
-
-        if (! $product->ingredients) {
-            return false;
-        }
-
-        foreach ($product->ingredients as $ingredient) {
-            if ($ingredient->is_disabled) {
-                continue;
-            }
-
-            $totalUsed = $this->getTotalIngredientUsedInCart($ingredient->id);
-            if ($ingredient->stock - $totalUsed < 0) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Calcola la quantità totale di un prodotto nel carrello
-     */
-    protected function getTotalInCart(int $productId): int
-    {
-        $total = 0;
-        foreach ($this->items as $item) {
-            if ($item['product_id'] === $productId) {
-                $total += $item['quantity'];
-            }
-        }
-
-        return $total;
-    }
-
-    /**
-     * Calcola lo stock rimanente di un prodotto considerando il carrello
-     */
-    protected function getRemainingStock(int $productId, int $currentStock): int
-    {
-        return $currentStock - $this->getTotalInCart($productId);
-    }
-
-    /**
-     * Verifica se un prodotto è fuori stock considerando sia lo stock che gli ingredienti
-     */
-    protected function isProductOutOfStock(Product $product): bool
-    {
-        if ($product->backorder) {
-            return false;
-        }
-
-        $remainingStock = $this->getRemainingStock($product->id, $product->stock);
-        if ($remainingStock < 0) {
-            return true;
-        }
-
-        return $this->hasInsufficientIngredients($product);
-    }
-
-    /**
-     * Ottiene i dati arricchiti di un prodotto per la visualizzazione
-     *
-     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool}
-     */
-    protected function getEnrichedProduct(Product $product, int $index): array
-    {
-        $totalInCart = $this->getTotalInCart($product->id);
-        $remainingStock = $this->getRemainingStock($product->id, $product->stock);
-        $hasInsufficientIngredients = $this->hasInsufficientIngredients($product);
-        $isOutOfStock = $this->isProductOutOfStock($product);
-
-        return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'price' => $product->price,
-            'stock' => $product->stock,
-            'backorder' => $product->backorder,
-            'number' => $index + 1,
-            'total_in_cart' => $totalInCart,
-            'remaining_stock' => $remainingStock,
-            'is_out_of_stock' => $isOutOfStock,
-            'has_insufficient_ingredients' => $hasInsufficientIngredients && ! $product->backorder,
-        ];
-    }
-
-    /**
      * @return array<int, array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool}>
      */
     public function getProducts(): array
@@ -409,7 +258,7 @@ class QuickCreateOrder extends Page
 
         $enrichedProducts = [];
         foreach ($products as $index => $product) {
-            $enrichedProducts[] = $this->getEnrichedProduct($product, $index);
+            $enrichedProducts[] = $this->orderService->getEnrichedProduct($this->items, $product, $index);
         }
 
         return $enrichedProducts;
@@ -432,66 +281,15 @@ class QuickCreateOrder extends Page
     }
 
     /**
-     * Ottiene i dati arricchiti di un item del carrello
-     *
-     * @param  array{product_id: int, quantity: int, note: string|null}  $item
-     * @return array{item: array, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}
-     */
-    protected function getEnrichedItem(array $item, int $originalIndex): array
-    {
-        $productNumbers = $this->getProductNumbersMap();
-        $product = Product::with('ingredients')->find($item['product_id']);
-
-        $rowTotal = 0;
-        $remainingStock = 0;
-        $isOutOfStock = false;
-        $hasInsufficientIngredients = false;
-
-        if ($product) {
-            $rowTotal = ((float) $product->price) * $item['quantity'];
-            $totalInCart = $this->getTotalInCart($item['product_id']);
-            $remainingStock = $product->stock - $totalInCart;
-            $hasInsufficientIngredients = $this->hasInsufficientIngredients($product);
-            $isOutOfStock = ! $product->backorder && ($remainingStock < 0 || $hasInsufficientIngredients);
-        }
-
-        return [
-            'item' => $item,
-            'original_index' => $originalIndex,
-            'sort_order' => $productNumbers[$item['product_id']] ?? 999,
-            'product' => $product,
-            'row_total' => $rowTotal,
-            'product_number' => $productNumbers[$item['product_id']] ?? 0,
-            'is_out_of_stock' => $isOutOfStock,
-            'has_insufficient_ingredients' => $hasInsufficientIngredients && $product && ! $product->backorder,
-            'remaining_stock' => $remainingStock,
-        ];
-    }
-
-    /**
      * Ottiene tutti gli item del carrello ordinati e arricchiti
      *
-     * @return array<int, array{item: array, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}>
+     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}>
      */
     public function getSortedEnrichedItems(): array
     {
-        $enrichedItems = [];
+        $productNumbers = $this->getProductNumbersMap();
 
-        foreach ($this->items as $index => $item) {
-            $enrichedItems[] = $this->getEnrichedItem($item, $index);
-        }
-
-        // Ordina per sort_order, se pari usa original_index
-        usort($enrichedItems, function ($a, $b) {
-            $sortOrderComparison = $a['sort_order'] <=> $b['sort_order'];
-            if ($sortOrderComparison === 0) {
-                return $a['original_index'] <=> $b['original_index'];
-            }
-
-            return $sortOrderComparison;
-        });
-
-        return $enrichedItems;
+        return $this->orderService->getSortedEnrichedItems($this->items, $productNumbers);
     }
 
     /**
@@ -499,25 +297,7 @@ class QuickCreateOrder extends Page
      */
     public function hasOutOfStockItems(): bool
     {
-        foreach ($this->items as $item) {
-            $product = Product::with('ingredients')->find($item['product_id']);
-            if (! $product || $product->backorder) {
-                continue;
-            }
-
-            $totalInCart = $this->getTotalInCart($item['product_id']);
-            $remainingStock = $product->stock - $totalInCart;
-
-            if ($remainingStock < 0) {
-                return true;
-            }
-
-            if ($this->hasInsufficientIngredients($product)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->orderService->hasOutOfStockItems($this->items);
     }
 
     /**
@@ -525,15 +305,7 @@ class QuickCreateOrder extends Page
      */
     public function getOrderTotal(): float
     {
-        $total = 0;
-        foreach ($this->items as $item) {
-            $product = Product::find($item['product_id']);
-            if ($product) {
-                $total += ((float) $product->price) * $item['quantity'];
-            }
-        }
-
-        return $total;
+        return $this->orderService->getOrderTotal($this->items);
     }
 
     /**
@@ -541,12 +313,7 @@ class QuickCreateOrder extends Page
      */
     public function getTotalItemsCount(): int
     {
-        $total = 0;
-        foreach ($this->items as $item) {
-            $total += $item['quantity'];
-        }
-
-        return $total;
+        return $this->orderService->getTotalItemsCount($this->items);
     }
 
     /**

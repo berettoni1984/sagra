@@ -103,17 +103,21 @@
                         @foreach($this->getSortedEnrichedItems() as $enrichedItem)
                             @php
                                 $item = $enrichedItem['item'];
-                                $index = $enrichedItem['original_index'];
+                                $itemId = $enrichedItem['item_id'];
+                                $originalIndex = $enrichedItem['original_index'];
                                 $product = $enrichedItem['product'];
                                 $rowTotal = $enrichedItem['row_total'];
                                 $productNumber = $enrichedItem['product_number'];
                                 $isOutOfStock = $enrichedItem['is_out_of_stock'];
                             @endphp
-                            <div @class([
-                                'flex flex-col gap-2 p-3 rounded-lg',
-                                'bg-gray-50 dark:bg-gray-800' => !$isOutOfStock,
-                                'bg-red-50 border-2 border-red-300 dark:bg-red-950 dark:border-red-700' => $isOutOfStock,
-                            ])>
+                            <div
+                                wire:key="item-{{ $itemId }}"
+                                @class([
+                                    'flex flex-col gap-2 p-3 rounded-lg',
+                                    'bg-gray-50 dark:bg-gray-800' => !$isOutOfStock,
+                                    'bg-red-50 border-2 border-red-300 dark:bg-red-950 dark:border-red-700' => $isOutOfStock,
+                                ])
+                            >
                                 <div class="flex items-center gap-3">
                                     {{-- Numero prodotto --}}
                                     <div class="flex items-center justify-center min-w-[2rem] h-8 px-2 text-sm font-bold text-gray-700 bg-gray-200 rounded dark:text-gray-300 dark:bg-gray-700 shrink-0">
@@ -142,7 +146,7 @@
                                         @if($item['quantity'] > 1)
                                             <button
                                                 type="button"
-                                                wire:click="splitItem({{ $index }})"
+                                                wire:click="splitItem({{ $originalIndex }})"
                                                 title="{{ __('filament.Split item') }}"
                                                 class="flex items-center justify-center rounded-lg w-8 h-8 bg-primary-100 hover:bg-primary-200 text-primary-700 dark:bg-primary-900 dark:hover:bg-primary-800 dark:text-primary-300 transition-colors"
                                             >
@@ -155,7 +159,7 @@
 
                                         <button
                                             type="button"
-                                            wire:click="decreaseQuantity({{ $index }})"
+                                            wire:click="decreaseQuantity({{ $originalIndex }})"
                                             class="flex items-center justify-center rounded-lg w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
                                         >
                                             <x-filament::icon
@@ -171,7 +175,7 @@
 
                                         <button
                                             type="button"
-                                            wire:click="increaseQuantity({{ $index }})"
+                                            wire:click="increaseQuantity({{ $originalIndex }})"
                                             class="flex items-center justify-center rounded-lg w-8 h-8 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
                                         >
                                             <x-filament::icon
@@ -188,7 +192,7 @@
 
                                     <button
                                         type="button"
-                                        wire:click="removeProduct({{ $index }})"
+                                        wire:click="removeProduct({{ $originalIndex }})"
                                         class="flex items-center justify-center rounded-lg w-8 h-8 text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-950 transition-colors shrink-0"
                                     >
                                         <x-filament::icon
@@ -202,7 +206,7 @@
                                 <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                                     <input
                                         type="text"
-                                        wire:model.blur="items.{{ $index }}.note"
+                                        wire:model.live="items.{{ $originalIndex }}.note"
                                         placeholder="{{ __('filament.Order Item Note') }}..."
                                         class="w-full text-sm rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
                                     />

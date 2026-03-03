@@ -11,6 +11,8 @@
 
     <!-- Exclude storage directory -->
     <exclude-pattern>*/storage/*</exclude-pattern>
+    <!-- Exclude tests directory -->
+    <exclude-pattern>*/tests/*</exclude-pattern>
 
     <!-- Import all rule sets -->
     <rule ref="rulesets/cleancode.xml">
