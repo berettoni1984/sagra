@@ -63,7 +63,7 @@
                                 @endif
 
                                 <span
-                                    class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-2 mt-2">
+                                    class="text-base font-semibold text-gray-900 dark:text-white text-center line-clamp-4 mt-2">
                                     {{ $product['name'] }}
                                 </span>
                                 <span class="text-sm text-gray-500 dark:text-gray-400 mt-2">
