@@ -147,6 +147,64 @@ class QuickCreateOrder extends Page
         $this->items = $this->orderService->splitItem($this->items, $index);
     }
 
+    /**
+     * Costruisce le righe d'ordine dal carrello e scarica le giacenze.
+     *
+     * Lo scarico passa da decrement(), cioè da un "stock = stock - ?" eseguito
+     * dal database: con read-modify-write due ordini concorrenti sullo stesso
+     * prodotto si sovrascrivono, perdendo uno dei due scarichi.
+     *
+     * @return array{0: array<int, array<string, mixed>>, 1: float}
+     */
+    private function scaricaCarrello(): array
+    {
+        $totalAmount = 0.0;
+        $orderItemsData = [];
+
+        foreach ($this->items as $item) {
+            /** @var Product|null $product */
+            $product = Product::find($item['product_id']);
+            if (! $product) {
+                continue;
+            }
+
+            $totalAmount += ((float) $product->price) * $item['quantity'];
+
+            $orderItemsData[] = [
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'quantity' => $item['quantity'],
+                'amount' => $product->price,
+                'row_amount' => $item['quantity'] * ((float) $product->price),
+                'note' => $item['note'],
+            ];
+
+            $product->decrement('stock', $item['quantity']);
+            $this->scaricaIngredienti($product, $item['quantity']);
+        }
+
+        return [$orderItemsData, $totalAmount];
+    }
+
+    /**
+     * Scarica gli ingredienti consumati da una riga, in proporzione al pivot qty.
+     */
+    private function scaricaIngredienti(Product $product, int $quantity): void
+    {
+        $product->ingredients->each(function (Ingredient $ingredient) use ($quantity) {
+            if ($ingredient->is_disabled) {
+                return;
+            }
+
+            $qty = (int) ($ingredient->pivot?->getAttributeValue('qty') ?? 0);
+            if ($qty === 0) {
+                return;
+            }
+
+            $ingredient->decrement('stock', $quantity * $qty);
+        });
+    }
+
     public function createOrder(): void
     {
         if (! $this->queueId) {
@@ -173,45 +231,7 @@ class QuickCreateOrder extends Page
             $queue->order_number = $number;
             $queue->save();
 
-            $totalAmount = 0;
-            $orderItemsData = [];
-
-            foreach ($this->items as $item) {
-                /** @var Product|null $product */
-                $product = Product::find($item['product_id']);
-                if (! $product) {
-                    continue;
-                }
-
-                $rowAmount = ((float) $product->price) * $item['quantity'];
-                $totalAmount += $rowAmount;
-
-                $orderItemsData[] = [
-                    'product_id' => $product->id,
-                    'name' => $product->name,
-                    'quantity' => $item['quantity'],
-                    'amount' => $product->price,
-                    'row_amount' => $item['quantity'] * ((float) $product->price),
-                    'note' => $item['note'],
-                ];
-
-                // Update stock: decrement() esegue "stock = stock - ?" lato SQL.
-                // Con read-modify-write due ordini concorrenti sullo stesso prodotto
-                // si sovrascrivono a vicenda perdendo uno dei due scarichi.
-                $product->decrement('stock', $item['quantity']);
-
-                // Update ingredients stock
-                $product->ingredients->each(function (Ingredient $ingredient) use ($item) {
-                    if ($ingredient->is_disabled) {
-                        return;
-                    }
-                    $qty = (int) ($ingredient->pivot?->getAttributeValue('qty') ?? 0);
-                    if ($qty === 0) {
-                        return;
-                    }
-                    $ingredient->decrement('stock', $item['quantity'] * $qty);
-                });
-            }
+            [$orderItemsData, $totalAmount] = $this->scaricaCarrello();
 
             // Calcola total_paid: usa customTotalPaid se impostato, altrimenti 0 se free, altrimenti totalAmount
             $totalPaid = $this->getPaid($totalAmount);

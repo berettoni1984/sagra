@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Config;
+use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Queue;
@@ -548,6 +549,9 @@ class OrderResource extends Resource
     }
 
     /**
+     * Quantità per prodotto e per ingrediente, confrontando lo stato salvato
+     * dell'ordine ("old") con quello attualmente nel form ("new").
+     *
      * @param  array<int|string,array<int|string,mixed>>  $orderItems
      * @return array<int|string,array<int|string,mixed>>
      */
@@ -556,9 +560,56 @@ class OrderResource extends Resource
         $qtyValue = [];
         $qtyIngredientValue = [];
 
-        // Una find() per riga di carrello, dentro un metodo già rivalutato per
-        // ogni riga del repeater: il costo cresceva col quadrato delle righe.
-        // Qui si caricano tutti i prodotti coinvolti in una sola query.
+        // Evita il lazy load di product+ingredients per ogni riga già salvata.
+        $order?->loadMissing('orderItems.product.ingredients');
+
+        foreach ($order->orderItems ?? [] as $orderItem) {
+            // product_id è nullable (prodotto cancellato dopo l'ordine): come
+            // chiave diventerebbe '' qui e 0 nel ciclo sotto, quindi le due voci
+            // non si riconcilierebbero mai. Senza prodotto non c'è nulla da
+            // confrontare.
+            if ($orderItem->product_id === null) {
+                continue;
+            }
+
+            self::accumulaQta($qtyValue, $orderItem->product_id, 'old', $orderItem->quantity);
+            self::accumulaIngredienti(
+                $qtyIngredientValue,
+                $orderItem->product?->ingredients,
+                'old',
+                $orderItem->quantity
+            );
+        }
+
+        $products = self::prodottiDelForm($orderItems);
+
+        foreach ($orderItems as $orderItem) {
+            $productId = (int) $orderItem['product_id'];
+            $quantity = (int) $orderItem['quantity'];
+
+            self::accumulaQta($qtyValue, $productId, 'new', $quantity);
+            self::accumulaIngredienti(
+                $qtyIngredientValue,
+                $products->get($productId)?->ingredients,
+                'new',
+                $quantity
+            );
+        }
+
+        return [$qtyValue, $qtyIngredientValue];
+    }
+
+    /**
+     * Prodotti citati dalle righe del form, in una sola query.
+     *
+     * Prima si eseguiva una find() per riga, dentro un metodo già rivalutato
+     * per ogni riga del repeater: il costo cresceva col quadrato delle righe.
+     *
+     * @param  array<int|string,array<int|string,mixed>>  $orderItems
+     * @return Collection<int,Product>
+     */
+    private static function prodottiDelForm(array $orderItems): Collection
+    {
         $productIds = collect($orderItems)
             ->pluck('product_id')
             ->map(static fn ($id): int => (int) $id)
@@ -566,57 +617,35 @@ class OrderResource extends Resource
             ->unique()
             ->all();
 
-        $products = $productIds === []
-            ? collect()
-            : Product::with('ingredients')->findMany($productIds)->keyBy('id');
+        if ($productIds === []) {
+            return collect();
+        }
 
-        // Evita il lazy load di product+ingredients per ogni riga già salvata.
-        $order?->loadMissing('orderItems.product.ingredients');
+        return Product::with('ingredients')->findMany($productIds)->keyBy('id');
+    }
 
-        foreach ($order->orderItems ?? [] as $orderItem) {
-            $productIdTmp = $orderItem->product_id;
-            // product_id è nullable (prodotto cancellato dopo l'ordine): come chiave
-            // diventerebbe '' qui e 0 nel ciclo sotto, quindi le due voci non si
-            // riconcilierebbero mai. Senza prodotto non c'è nulla da confrontare.
-            if ($productIdTmp === null) {
+    /**
+     * @param  array<int|string,array<string,int>>  $totali
+     */
+    private static function accumulaQta(array &$totali, int $key, string $slot, int $quantity): void
+    {
+        $totali[$key] ??= ['old' => 0, 'new' => 0];
+        $totali[$key][$slot] += $quantity;
+    }
+
+    /**
+     * @param  array<int|string,array<string,int>>  $totali
+     * @param  iterable<Ingredient>|null  $ingredients
+     */
+    private static function accumulaIngredienti(array &$totali, ?iterable $ingredients, string $slot, int $quantity): void
+    {
+        foreach ($ingredients ?? [] as $ingredient) {
+            if ($ingredient->is_disabled) {
                 continue;
             }
-            $quantity = $orderItem->quantity;
-            if (! isset($qtyValue[$productIdTmp]['old'])) {
-                $qtyValue[$productIdTmp] = ['old' => 0, 'new' => 0];
-            }
-            $qtyValue[$productIdTmp]['old'] += $quantity;
-            foreach ($orderItem->product->ingredients ?? [] as $ingredient) {
-                if ($ingredient->is_disabled) {
-                    continue;
-                }
-                $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
-                if (! isset($qtyIngredientValue[$ingredient->id])) {
-                    $qtyIngredientValue[$ingredient->id] = ['old' => 0, 'new' => 0];
-                }
-                $qtyIngredientValue[$ingredient->id]['old'] += ($quantity * $qty);
-            }
-        }
-        foreach ($orderItems as $orderItem) {
-            $productIdTmp = (int) $orderItem['product_id'];
-            $product = $products->get($productIdTmp);
-            $quantity = (int) $orderItem['quantity'];
-            if (! isset($qtyValue[$productIdTmp])) {
-                $qtyValue[$productIdTmp] = ['old' => 0, 'new' => 0];
-            }
-            $qtyValue[$productIdTmp]['new'] += $quantity;
-            foreach ($product->ingredients ?? [] as $ingredient) {
-                if ($ingredient->is_disabled) {
-                    continue;
-                }
-                $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
-                if (! isset($qtyIngredientValue[$ingredient->id])) {
-                    $qtyIngredientValue[$ingredient->id] = ['old' => 0, 'new' => 0];
-                }
-                $qtyIngredientValue[$ingredient->id]['new'] += ($quantity * $qty);
-            }
-        }
 
-        return [$qtyValue, $qtyIngredientValue];
+            $qty = (int) ($ingredient->pivot?->getAttributeValue('qty') ?? 0);
+            self::accumulaQta($totali, $ingredient->id, $slot, $quantity * $qty);
+        }
     }
 }

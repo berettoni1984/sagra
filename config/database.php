@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Mysql;
 
 return [
 
@@ -57,7 +58,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 // PDO::MYSQL_ATTR_SSL_CA e' deprecata in PHP 8.4 (il progetto
                 // richiede ^8.4) e faceva emettere un deprecation a ogni test.
-                Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
@@ -79,7 +80,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 // PDO::MYSQL_ATTR_SSL_CA e' deprecata in PHP 8.4 (il progetto
                 // richiede ^8.4) e faceva emettere un deprecation a ogni test.
-                Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
 
