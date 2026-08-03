@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\Ingredient;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ingredient>
+ * @extends Factory<Ingredient>
  */
 class IngredientFactory extends Factory
 {
@@ -17,7 +18,19 @@ class IngredientFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'name' => fake()->unique()->words(2, true),
+            'stock' => fake()->numberBetween(10, 500),
+            'is_disabled' => false,
         ];
+    }
+
+    public function disabled(): static
+    {
+        return $this->state(['is_disabled' => true]);
+    }
+
+    public function exhausted(): static
+    {
+        return $this->state(['stock' => 0]);
     }
 }

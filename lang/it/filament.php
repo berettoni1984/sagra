@@ -113,5 +113,6 @@ return [
     'Change Price' => 'Cambia Prezzo',
     'Leave empty to use full amount' => 'Lascia vuoto per usare l\'importo completo',
     'Roles' => 'Ruoli',
+    'Sold' => 'Venduti',
 
 ];
