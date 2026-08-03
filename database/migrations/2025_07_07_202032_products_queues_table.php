@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Product;
+use App\Models\Queue;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +17,7 @@ return new class extends Migration
             $table->foreignId('product_id');
             $table->foreignId('queue_id');
         });
-        $queues = \App\Models\Queue::all();
+        $queues = Queue::all();
         if (! $queues) {
             return;
         }

@@ -1,5 +1,7 @@
 <?php
 
+use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\QueueSeeder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -24,13 +26,13 @@ return new class extends Migration
             $table->foreignId('queue_id')->nullable()->constrained();
         });
         // Run the DatabaseSeeder
-        \Artisan::call('db:seed', [
-            '--class' => \Database\Seeders\DatabaseSeeder::class,
+        Artisan::call('db:seed', [
+            '--class' => DatabaseSeeder::class,
             '--force' => true,
         ]);
         // Run the DatabaseSeeder
-        \Artisan::call('db:seed', [
-            '--class' => \Database\Seeders\QueueSeeder::class,
+        Artisan::call('db:seed', [
+            '--class' => QueueSeeder::class,
             '--force' => true,
         ]);
 

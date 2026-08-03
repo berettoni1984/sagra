@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Database\Factories\ConfigFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * App\Models\Config
@@ -11,8 +13,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $code
  * @property string $config_value
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  *
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Config newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Config newQuery()
@@ -31,7 +33,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Config extends Model
 {
-    /** @use HasFactory<\Database\Factories\ConfigFactory> */
+    /** @use HasFactory<ConfigFactory> */
     use HasFactory;
 
     /**

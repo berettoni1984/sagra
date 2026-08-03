@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
+use App\Models\Config;
 use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
@@ -352,7 +353,7 @@ class QuickCreateOrder extends Page
      */
     public function isFreeConfigEnabled(): bool
     {
-        return (bool) \App\Models\Config::value('free');
+        return (bool) Config::value('free');
     }
 
     /**

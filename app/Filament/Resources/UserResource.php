@@ -4,6 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -70,16 +73,20 @@ class UserResource extends Resource
                 // record, serializzando l'hash bcrypt dell'utente nello snapshot
                 // Livewire inviato al browser. I due hook mutateFormData*
                 // costruiscono già $data['password'] da passwordS1.
+                //
+                // La regex è senza il flag /i: con /i i lookahead su maiuscole e
+                // minuscole diventavano ridondanti e 'abcdefg1!' superava il
+                // requisito "deve contenere una maiuscola".
                 Forms\Components\TextInput::make('passwordS1')
                     ->label(__('filament.Password'))
                     ->password()
-                    ->regex('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).*$/i')
+                    ->regex('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).*$/')
                     ->minLength(8)
                     ->hiddenOn('view'),
                 Forms\Components\TextInput::make('passwordS2')
                     ->label(__('filament.ConfirmPassword'))
                     ->password()
-                    ->regex('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).*$/i')
+                    ->regex('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).*$/')
                     ->minLength(8)
                     ->hiddenOn('view'),
                 Forms\Components\Select::make('roles')
@@ -119,11 +126,11 @@ class UserResource extends Resource
             ->filters([
             ])
             ->recordActions([
-                \Filament\Actions\EditAction::make(),
+                EditAction::make(),
             ])
             ->toolbarActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
         //            ->emptyStateActions([

@@ -123,21 +123,21 @@ it('il force delete di un ordine gia soft-deleted rimuove anche le righe soft-de
         ->and(OrderItem::withTrashed()->whereIn('id', $righe->pluck('id'))->count())->toBe(0);
 });
 
-it('BUG NOTO: ripristinando un ordine le sue righe restano soft-deleted', function () {
+it('ripristinando un ordine risalgono anche le sue righe', function () {
     $order = Order::factory()->create();
     $righe = OrderItem::factory()->count(2)->create(['order_id' => $order->id]);
     $order->delete();
 
     $order->restore();
 
-    // Order::booted() ha solo l'hook deleting, nessun restoring: le righe
-    // non risalgono. L'ordine ripristinato risulta vuoto e a totale
-    // incoerente. Il test documenta il comportamento attuale.
+    // Order::booted() ha ora un hook restoring accanto a deleting: senza di
+    // esso le righe restavano cancellate e l'ordine ripristinato risultava
+    // vuoto, con un totale incoerente rispetto agli articoli mostrati.
     expect(Order::find($order->id))->not->toBeNull()
         ->and(Order::find($order->id)->deleted_at)->toBeNull()
-        ->and($order->fresh()->orderItems)->toHaveCount(0)
-        ->and($order->fresh()->getOrderItemsQty())->toBe(0)
-        ->and(OrderItem::onlyTrashed()->whereIn('id', $righe->pluck('id'))->count())->toBe(2);
+        ->and($order->fresh()->orderItems)->toHaveCount(2)
+        ->and($order->fresh()->getOrderItemsQty())->toBeGreaterThan(0)
+        ->and(OrderItem::onlyTrashed()->whereIn('id', $righe->pluck('id'))->count())->toBe(0);
 });
 
 it('rende assegnabili in massa i campi dell ordine', function () {

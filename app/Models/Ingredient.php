@@ -2,19 +2,22 @@
 
 namespace App\Models;
 
+use Database\Factories\IngredientFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Support\Carbon;
 
 /**
  * @property ?Pivot $pivot
  * @property int $id
  * @property string $name
  * @property int $stock
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Product> $products
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read Collection<int, Product> $products
  * @property-read int|null $products_count
  *
  * @method static \Database\Factories\IngredientFactory factory($count = null, $state = [])
@@ -35,7 +38,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  */
 class Ingredient extends Model
 {
-    /** @use HasFactory<\Database\Factories\IngredientFactory> */
+    /** @use HasFactory<IngredientFactory> */
     use HasFactory;
 
     /**

@@ -4,6 +4,7 @@ use App\Filament\Imports\ProductImporter;
 use App\Models\Product;
 use App\Models\Queue;
 use Filament\Actions\Imports\Models\Import;
+use Illuminate\Validation\ValidationException;
 
 /**
  * L'importer viene invocato una riga alla volta da Filament, dopo aver
@@ -173,4 +174,90 @@ it('ignora la riga senza nome', function () {
     importer(mappaIdentita())(['id' => '', 'name' => '', 'price' => '1.00']);
 
     expect(Product::count())->toBe($prima);
+});
+
+it('aggiorna il prodotto esistente riconoscendolo dal nome quando l id e vuoto', function () {
+    // prima "id non trovato ⇒ crea" duplicava il catalogo a ogni reimportazione
+    $prodotto = Product::factory()->create(['name' => 'PANINO', 'price' => '1.00']);
+
+    importer(mappaIdentita())(['id' => '', 'name' => 'PANINO', 'price' => '6.50', 'queues' => '']);
+
+    expect(Product::where('name', 'PANINO')->count())->toBe(1)
+        ->and($prodotto->fresh()->price)->toBe('6.50');
+});
+
+it('aggiorna il prodotto per nome anche se l id proviene da un altro ambiente', function () {
+    $prodotto = Product::factory()->create(['name' => 'PIADINA', 'price' => '1.00']);
+
+    importer(mappaIdentita())(['id' => '999999', 'name' => 'PIADINA', 'price' => '3.30', 'queues' => '']);
+
+    expect(Product::where('name', 'PIADINA')->count())->toBe(1)
+        ->and($prodotto->fresh()->price)->toBe('3.30');
+});
+
+it('rifiuta con un errore di validazione una giacenza fuori dal range smallint', function () {
+    // products.stock e' smallint: prima il database rispondeva con un errore
+    // grezzo 22003 invece di una violazione di validazione leggibile
+    expect(fn () => importer(mappaIdentita())(
+        ['id' => '', 'name' => 'ESAGERATO', 'price' => '1.00', 'stock' => '40000']
+    ))->toThrow(ValidationException::class);
+
+    expect(Product::firstWhere('name', 'ESAGERATO'))->toBeNull();
+});
+
+it('normalizza a zero un prezzo non numerico invece di andare in errore', function () {
+    // il cast ->numeric() di Filament trasforma 'abc' in 0 prima della
+    // validazione, quindi la riga passa e il prodotto nasce a prezzo zero
+    importer(mappaIdentita())(['id' => '', 'name' => 'PREZZO ROTTO', 'price' => 'abc']);
+
+    expect(Product::firstWhere('name', 'PREZZO ROTTO')->price)->toBe('0.00');
+});
+
+it('non fallisce con la cella prezzo vuota', function () {
+    // '' viene castato a NULL: products.price e' NOT NULL, quindi il default
+    // del model deve reggere
+    importer(mappaIdentita())(['id' => '', 'name' => 'PREZZO VUOTO', 'price' => '']);
+
+    expect(Product::firstWhere('name', 'PREZZO VUOTO'))->not->toBeNull();
+});
+
+it('il separatore decimale deve essere il punto, non la virgola', function () {
+    // ATTENZIONE: il cast ->numeric() rimuove la virgola, quindi '12,50'
+    // diventa 1250. L'export del progetto scrive il punto, quindi un
+    // andata-e-ritorno e' sicuro; il rischio e' la digitazione manuale.
+    importer(mappaIdentita())(['id' => '', 'name' => 'CON VIRGOLA', 'price' => '12,50']);
+
+    expect(Product::firstWhere('name', 'CON VIRGOLA')->price)->toBe('1250.00');
+});
+
+it('rifiuta un prezzo negativo', function () {
+    expect(fn () => importer(mappaIdentita())(
+        ['id' => '', 'name' => 'PREZZO NEGATIVO', 'price' => '-5']
+    ))->toThrow(ValidationException::class);
+});
+
+it('crea il prodotto a prezzo zero se la colonna prezzo non e mappata', function () {
+    // products.price e' NOT NULL senza default
+    importer(['id' => 'id', 'name' => 'name'])(['id' => '', 'name' => 'SENZA PREZZO']);
+
+    expect(Product::firstWhere('name', 'SENZA PREZZO')->price)->toBe('0.00');
+});
+
+it('un import di solo aggiornamento non richiede nome e prezzo', function () {
+    $prodotto = Product::factory()->create(['stock' => 5]);
+
+    importer(['id' => 'id', 'stock' => 'stock'])(['id' => (string) $prodotto->id, 'stock' => '77']);
+
+    expect($prodotto->fresh()->stock)->toBe(77);
+});
+
+it('collega le code anche ai prodotti appena creati', function () {
+    // afterSave() prima non girava per i nuovi record, perche' resolveRecord()
+    // restituiva null e Filament saltava validazione, fill, save e hook
+    $coda = Queue::factory()->create(['comment' => 'pizza']);
+
+    importer(mappaIdentita())(['id' => '', 'name' => 'NUOVO CON CODA', 'price' => '2.00', 'queues' => 'pizza']);
+
+    expect(Product::firstWhere('name', 'NUOVO CON CODA')->queues->pluck('comment')->all())
+        ->toBe(['pizza']);
 });

@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderItemExporter extends Exporter
 {
@@ -21,10 +22,10 @@ class OrderItemExporter extends Exporter
      * Le colonne leggono order, order.queue, order.user e product: senza eager
      * loading ogni riga esportata ne caricava una a una.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<OrderItem>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<OrderItem>
+     * @param  Builder<OrderItem>  $query
+     * @return Builder<OrderItem>
      */
-    public static function modifyQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    public static function modifyQuery(Builder $query): Builder
     {
         return $query->with(['order.queue', 'order.user', 'product']);
     }

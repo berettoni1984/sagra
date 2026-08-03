@@ -8,15 +8,22 @@ use App\Models\Config;
 use App\Models\Product;
 use App\Models\Queue;
 use Carbon\Carbon;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
@@ -146,7 +153,7 @@ class ProductResource extends Resource
             ->filters([
                 Filter::make('created_at_range')
                     ->schema([
-                        \Filament\Schemas\Components\Fieldset::make(__('filament.created_at_range'))
+                        Fieldset::make(__('filament.created_at_range'))
                             ->schema([
                                 DateTimePicker::make('created_from')
                                     ->label(__('filament.From')),
@@ -190,7 +197,7 @@ class ProductResource extends Resource
                         });
                     })
                     ->label(__('filament.Created At Range')),
-                Tables\Filters\Filter::make('queue')
+                Filter::make('queue')
                     ->schema([
                         Forms\Components\Select::make('queue')
                             ->label(__('filament.queue_label_plural'))
@@ -230,12 +237,12 @@ class ProductResource extends Resource
             ->selectCurrentPageOnly(false)
             ->filtersLayout(FiltersLayout::AboveContent)
             ->recordActions([
-                \Filament\Actions\EditAction::make(),
+                EditAction::make(),
             ])
             ->toolbarActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
-                    \Filament\Actions\BulkAction::make('queues')
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
+                    BulkAction::make('queues')
                         ->label(__('filament.Queue'))
                         ->schema([
                             Forms\Components\Select::make('queues')
@@ -244,7 +251,7 @@ class ProductResource extends Resource
                                 ->options(Queue::all()->pluck('label', 'id'))
                                 ->required(),
                         ])
-                        ->action(function (\Filament\Actions\BulkAction $action, \Illuminate\Support\Collection $records, array $data) {
+                        ->action(function (BulkAction $action, Collection $records, array $data) {
                             foreach ($records as $record) {
                                 $record->queues()->sync($data['queues'] ?? null);
                                 $record->save();
@@ -255,7 +262,7 @@ class ProductResource extends Resource
                 ]),
             ])
             ->emptyStateActions([
-                \Filament\Actions\CreateAction::make(),
+                CreateAction::make(),
             ]);
     }
 

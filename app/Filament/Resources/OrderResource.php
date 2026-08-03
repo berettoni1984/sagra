@@ -7,11 +7,19 @@ use App\Models\Config;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Queue;
+use App\Services\OrderStockService;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
 use Filament\Tables;
+use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -41,6 +49,13 @@ class OrderResource extends Resource
     private static array $latestOrderIdCache = [];
 
     /**
+     * Prodotti per coda (e ricerca), risolti una volta per richiesta.
+     *
+     * @var array<string, Collection<int,string>>
+     */
+    private static array $queueProductsCache = [];
+
+    /**
      * @param  Order  $record
      */
     public static function canEdit(Model $record): bool
@@ -63,6 +78,33 @@ class OrderResource extends Resource
         }
 
         return parent::canEdit($record);
+    }
+
+    /**
+     * Un admin può annullare qualunque ordine; una cassa solo il proprio più
+     * recente, come per la modifica.
+     *
+     * Prima non c'era alcun controllo: dalla pagina di dettaglio o dall'elenco
+     * una cassa poteva annullare gli ordini di altri operatori, con relativo
+     * ricalcolo delle giacenze.
+     *
+     * @param  Order  $record
+     */
+    public static function canDelete(Model $record): bool
+    {
+        if (auth()->user()?->isAdmin()) {
+            return parent::canDelete($record);
+        }
+
+        return static::canEdit($record) && parent::canDelete($record);
+    }
+
+    /**
+     * @param  Order  $record
+     */
+    public static function canForceDelete(Model $record): bool
+    {
+        return (auth()->user()?->isAdmin() ?? false) && parent::canForceDelete($record);
     }
 
     public static function getNavigationGroup(): string|\UnitEnum|null
@@ -340,30 +382,33 @@ class OrderResource extends Resource
                 //
             ])
             ->recordActions([
-                \Filament\Actions\ViewAction::make()
+                ViewAction::make()
                     ->hidden(fn ($record) => static::canEdit($record)),
-                \Filament\Actions\EditAction::make()
+                EditAction::make()
                     ->hidden(fn ($record) => ! static::canEdit($record)),
-                \Filament\Actions\Action::make('print')
+                Action::make('print')
                     ->icon('heroicon-o-printer')
                     ->url(fn ($record) => static::getUrl('print', ['record' => $record->id, 'print' => true]))
                     ->label(__('filament.Print')),
-            ], position: \Filament\Tables\Enums\RecordActionsPosition::BeforeColumns)
+            ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
-                \Filament\Actions\BulkActionGroup::make([
+                BulkActionGroup::make([
                     // Senza questo hook annullare N ordini errati dall'elenco non
                     // restituiva nulla a magazzino, e i prodotti restavano
                     // falsamente esauriti per il resto della serata.
-                    \Filament\Actions\DeleteBulkAction::make()
-                        ->before(static function (\Illuminate\Support\Collection $records) {
-                            /** @var \Illuminate\Support\Collection<int, Order> $records */
-                            app(\App\Services\OrderStockService::class)->restoreMany($records);
+                    // La cancellazione multipla resta agli admin: una cassa puo'
+                    // annullare solo il proprio ultimo ordine, uno alla volta.
+                    DeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isAdmin() ?? false)
+                        ->before(static function (Collection $records) {
+                            /** @var Collection<int, Order> $records */
+                            app(OrderStockService::class)->restoreMany($records);
                         }),
                 ]),
             ])
             ->selectCurrentPageOnly(false)
             ->emptyStateActions([
-                \Filament\Actions\CreateAction::make(),
+                CreateAction::make(),
             ]);
     }
 
@@ -472,14 +517,24 @@ class OrderResource extends Resource
      */
     public static function getProducts(callable $get, ?string $search = null): Collection
     {
-        $products = Product::whereIsDisabled(false)
-            ->join('product_queue', 'products.id', '=', 'product_queue.product_id')
-            ->orderBy('products.order')
-            ->select('products.*')
-            ->where('product_queue.queue_id', $get('../../queue_id'))
-            ->when($search, fn ($q, $search) => $q->where('products.name', 'like', "%{$search}%"))
-            ->get()
-            ->pluck('label', 'id');
+        // Il select prodotto viene rivalutato per ogni riga del repeater a ogni
+        // ricalcolo: senza memoizzazione l'elenco dei prodotti della coda veniva
+        // riletto dal database una volta per riga.
+        $queueId = (int) $get('../../queue_id');
+        $cacheKey = $queueId.'|'.($search ?? '');
+
+        if (! array_key_exists($cacheKey, self::$queueProductsCache)) {
+            self::$queueProductsCache[$cacheKey] = Product::whereIsDisabled(false)
+                ->join('product_queue', 'products.id', '=', 'product_queue.product_id')
+                ->orderBy('products.order')
+                ->select('products.*')
+                ->where('product_queue.queue_id', $queueId)
+                ->when($search, fn ($q, $search) => $q->where('products.name', 'like', "%{$search}%"))
+                ->get()
+                ->pluck('label', 'id');
+        }
+
+        $products = self::$queueProductsCache[$cacheKey];
         $repeatProducts = Config::value('repeat_products') ?? 0;
         $selectedProducts = [];
         if (! $repeatProducts) {

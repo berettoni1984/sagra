@@ -4,6 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\LogoResource\Pages;
 use App\Models\Logo;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -22,6 +25,15 @@ class LogoResource extends Resource
     protected static ?int $navigationSort = 9;
 
     protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-photo';
+
+    /**
+     * Il logo finisce su ogni scontrino stampato: è configurazione, quindi
+     * riservata agli admin come ConfigResource.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
 
     public static function getLabel(): ?string
     {
@@ -86,11 +98,11 @@ class LogoResource extends Resource
                 //
             ])
             ->recordActions([
-                \Filament\Actions\ViewAction::make(),
+                ViewAction::make(),
             ])
             ->toolbarActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

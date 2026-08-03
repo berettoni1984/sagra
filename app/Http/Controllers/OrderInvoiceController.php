@@ -7,10 +7,11 @@ namespace App\Http\Controllers;
 use App\Models\Config;
 use App\Models\Logo;
 use App\Models\Order;
+use Illuminate\View\View;
 
 class OrderInvoiceController extends Controller
 {
-    public function show(int $orderId): \Illuminate\View\View
+    public function show(int $orderId): View
     {
         $order = Order::findOrFail($orderId);
         $print = (bool) request()->query('print', '0');

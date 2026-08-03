@@ -2,22 +2,25 @@
 
 namespace App\Models;
 
+use Database\Factories\QueueFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $name
  * @property string|null $comment
  * @property int $order_number
- * @property \Illuminate\Support\Carbon|null $reset_at
+ * @property Carbon|null $reset_at
  * @property bool $is_disabled
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  *
  * @method static \Database\Factories\QueueFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue newModelQuery()
@@ -32,10 +35,10 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereResetAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereUpdatedAt($value)
  *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Order> $orders
+ * @property-read Collection<int, Order> $orders
  * @property-read int|null $orders_count
  * @property-read string $label
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Product> $products
+ * @property-read Collection<int, Product> $products
  * @property-read int|null $products_count
  * @property bool $is_default
  *
@@ -45,7 +48,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  */
 class Queue extends Model
 {
-    /** @use HasFactory<\Database\Factories\QueueFactory> */
+    /** @use HasFactory<QueueFactory> */
     use HasFactory;
 
     /**

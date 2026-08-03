@@ -11,6 +11,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Tables;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
@@ -108,7 +109,7 @@ class OrderItemResource extends Resource
             ->filters([
                 Filter::make('created_at_range')
                     ->form([
-                        \Filament\Schemas\Components\Fieldset::make(__('filament.created_at_range'))
+                        Fieldset::make(__('filament.created_at_range'))
                             ->schema([
                                 DateTimePicker::make('created_from')
                                     ->label(__('filament.From')),
