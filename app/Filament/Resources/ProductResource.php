@@ -111,13 +111,7 @@ class ProductResource extends Resource
                 static function () {
 
                     return Product::query()
-                        ->select([
-                            'products.id', 'products.name', 'products.price', 'products.stock', 'products.backorder', 'products.order', 'products.is_disabled',
-                            \DB::raw('SUM(order_items.quantity) as order_items_sum_quantity'),
-                        ])
-                        ->leftJoin('order_items', 'products.id', '=', 'order_items.product_id')
-                        ->leftJoin('orders', 'orders.id', '=', 'order_items.order_id')
-                        ->groupBy(['products.id', 'products.name', 'products.price', 'products.stock', 'products.backorder', 'products.order', 'products.is_disabled'])
+                        ->withSum('orderItems', 'quantity')
                         ->with(['queues']);
                 }
             )
@@ -186,21 +180,18 @@ class ProductResource extends Resource
                         if (! $from && ! $to) {
                             return $query;
                         }
-                        $query->whereNull('orders.deleted_at')
-                            ->whereNull('order_items.deleted_at');
 
-                        if ($from && $to) {
-                            $query->whereBetween('orders.created_at', [
-                                $from,
-                                $to,
-                            ]);
-                        } elseif ($from) {
-                            $query->where('orders.created_at', '>=', $from);
-                        } elseif ($to) {
-                            $query->where('orders.created_at', '<=', $to);
-                        }
-
-                        return $query;
+                        return $query->whereHas('orderItems', function (Builder $itemsQuery) use ($from, $to) {
+                            $itemsQuery->whereHas('order', function (Builder $orderQuery) use ($from, $to) {
+                                if ($from && $to) {
+                                    $orderQuery->whereBetween('created_at', [$from, $to]);
+                                } elseif ($from) {
+                                    $orderQuery->where('created_at', '>=', $from);
+                                } elseif ($to) {
+                                    $orderQuery->where('created_at', '<=', $to);
+                                }
+                            });
+                        });
                     })
                     ->label(__('filament.Created At Range')),
                 Tables\Filters\Filter::make('queue')
