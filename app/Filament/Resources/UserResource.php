@@ -9,6 +9,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Spatie\Permission\Models\Role;
 
 /**
  * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
@@ -22,6 +23,15 @@ class UserResource extends Resource
     protected static ?int $navigationSort = 11;
 
     protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-shield-check';
+
+    /**
+     * Gestione utenti riservata agli admin: prima qualunque cassiere poteva
+     * aprire /users/{id}/edit e cambiare email e password del titolare.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
 
     public static function getLabel(): ?string
     {
@@ -56,7 +66,10 @@ class UserResource extends Resource
                     ->email()
                     ->required()
                     ->unique(ignoreRecord: true),
-                Forms\Components\Hidden::make('password'),
+                // Nessun campo 'password' nel form: in modifica veniva popolato dal
+                // record, serializzando l'hash bcrypt dell'utente nello snapshot
+                // Livewire inviato al browser. I due hook mutateFormData*
+                // costruiscono già $data['password'] da passwordS1.
                 Forms\Components\TextInput::make('passwordS1')
                     ->label(__('filament.Password'))
                     ->password()
@@ -69,6 +82,21 @@ class UserResource extends Resource
                     ->regex('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^\w\s]).*$/i')
                     ->minLength(8)
                     ->hiddenOn('view'),
+                Forms\Components\Select::make('roles')
+                    ->label(__('filament.Roles'))
+                    ->multiple()
+                    ->required()
+                    ->options(fn () => Role::query()->pluck('name', 'name'))
+                    ->default([User::ROLE_CASSA])
+                    ->formatStateUsing(fn ($record) => $record
+                        ? $record->roles->pluck('name')->toArray()
+                        : [User::ROLE_CASSA])
+                    // I ruoli stanno su una pivot, non su users: senza questo
+                    // sarebbero trattati come una colonna inesistente.
+                    ->saveRelationshipsUsing(function ($component, $state) {
+                        $component->getRecord()?->syncRoles($state ?? []);
+                    })
+                    ->dehydrated(false),
             ]);
     }
 
@@ -84,6 +112,9 @@ class UserResource extends Resource
                     ->label(__('filament.Email')),
                 Tables\Columns\TextColumn::make('code')
                     ->label(__('filament.Code')),
+                Tables\Columns\TextColumn::make('roles.name')
+                    ->badge()
+                    ->label(__('filament.Roles')),
             ])
             ->filters([
             ])

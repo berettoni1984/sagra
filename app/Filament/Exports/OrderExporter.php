@@ -12,6 +12,18 @@ class OrderExporter extends Exporter
 {
     protected static ?string $model = Order::class;
 
+    /**
+     * Le colonne leggono queue e user: senza eager loading ogni riga esportata
+     * le caricava una a una.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Order>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<Order>
+     */
+    public static function modifyQuery(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->with(['queue', 'user']);
+    }
+
     public static function getColumns(): array
     {
         return [
@@ -25,7 +37,8 @@ class OrderExporter extends Exporter
             ExportColumn::make('created_at')
                 ->label(__('filament.Created At'))
                 ->state(function (Order $record): ?string {
-                    $timezone = Config::whereCode('timezone')->first()->config_value ?? config('app.timezone');
+                    // Config::value() è memoizzato: prima una query per riga.
+                    $timezone = Config::value('timezone') ?: config('app.timezone');
 
                     return $record->created_at?->timezone($timezone)->format('Y-m-d H:i:s');
                 }),

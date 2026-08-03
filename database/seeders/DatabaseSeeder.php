@@ -37,7 +37,10 @@ class DatabaseSeeder extends Seeder
                 'code' => 'timezone',
             ],
             [
-                'config_value' => 'CEST',
+                // Identificativo IANA, non l'abbreviazione CEST: quella è un
+                // offset fisso +02:00 senza regole di ora legale, quindi da fine
+                // ottobre a fine marzo sfasava di un'ora tutti i timestamp.
+                'config_value' => 'Europe/Rome',
                 'comment' => 'NON TOCCARE, fuso orario',
             ]
         );

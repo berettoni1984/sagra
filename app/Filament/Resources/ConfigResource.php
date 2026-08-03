@@ -42,6 +42,15 @@ class ConfigResource extends Resource
         return __('filament.config_label_plural');
     }
 
+    /**
+     * Configurazioni riservate agli admin: valori come max_qty, free o
+     * invoice_print cambiano il comportamento dell'intero pannello.
+     */
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -49,7 +58,10 @@ class ConfigResource extends Resource
                 Forms\Components\TextInput::make('code')
                     ->required()
                     ->label(__('filament.Code')),
+                // configs.config_value è NOT NULL e Filament converte l'input vuoto
+                // in null: salvare a campo vuoto dava un 500 (colonna not null).
                 Forms\Components\TextInput::make('config_value')
+                    ->required()
                     ->label(__('filament.Value')),
                 Forms\Components\Textarea::make('comment')
                     ->label(__('filament.Comment')),

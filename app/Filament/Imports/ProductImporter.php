@@ -53,30 +53,31 @@ class ProductImporter extends Importer
         if ($product instanceof Model) {
             return $product;
         }
-        $keyColumnName = $this->columnMap['name'] ?? 'name';
-        $keyColumnPrice = $this->columnMap['price'] ?? 'price';
-        $keyColumnIsDisabled = $this->columnMap['is_disabled'] ?? 'is_disabled';
-        $keyColumnOrder = $this->columnMap['order'] ?? 'order';
-        $keyColumnStock = $this->columnMap['stock'] ?? 'stock';
-        $keyColumnBackorder = $this->columnMap['backorder'] ?? 'backorder';
-        $keyColumnQueue = $this->columnMap['queues'] ?? 'queues';
-        $queues = $this->data[$keyColumnQueue] ?? [];
+
+        // remapData() + castData() girano prima di resolveRecord() e scrivono i
+        // valori GIÀ castati sulla chiave col nome canonico della colonna.
+        // Leggendo invece $this->columnMap[...] (l'header del CSV) si otteneva la
+        // stringa grezza: (bool) 'FALSE' e (bool) 'no' valgono true, quindi un
+        // export con backorder = FALSE creava prodotti in backorder, disattivando
+        // ogni controllo di giacenza.
+        $queues = $this->data['queues'] ?? [];
         if (is_string($queues)) {
             $queues = explode(',', $queues);
         }
         $queuesSelected = Queue::whereIn('comment', $queues)->pluck('id')->toArray();
 
-        if ($this->data[$keyColumnName] ?? null) {
+        if ($this->data['name'] ?? null) {
             $product = Product::create([
-                'name' => $this->data[$keyColumnName],
-                'price' => $this->data[$keyColumnPrice] ?? 0,
-                'is_disabled' => (bool) ($this->data[$keyColumnIsDisabled] ?? true),
-                'order' => (int) ($this->data[$keyColumnOrder] ?? (Product::max('order') ?? 0) + 1),
-                'stock' => $this->data[$keyColumnStock] ?? 0,
-                'backorder' => (bool) ($this->data[$keyColumnBackorder] ?? false),
+                'name' => $this->data['name'],
+                'price' => $this->data['price'] ?? 0,
+                // Default false: con true un listino name;price creava tutti i
+                // prodotti disattivati e invisibili in cassa.
+                'is_disabled' => $this->data['is_disabled'] ?? false,
+                'order' => (int) ($this->data['order'] ?? (Product::max('order') ?? 0) + 1),
+                'stock' => $this->data['stock'] ?? 0,
+                'backorder' => $this->data['backorder'] ?? false,
             ]);
             $product->queues()->sync($queuesSelected);
-            $this->data[$keyColumnId] = $product->id;
         }
 
         return null;
@@ -102,13 +103,34 @@ class ProductImporter extends Importer
 
     public function afterSave(): void
     {
-        $keyColumnQueue = $this->columnMap['queues'] ?? 'queues';
-        $queues = $this->data[$keyColumnQueue] ?? [];
-        $queues = explode(',', $queues);
-        $queuesSelected = Queue::whereIn('comment', $queues)->pluck('id')->toArray();
+        $raw = $this->data['queues'] ?? null;
+
+        // Colonna 'queues' non mappata: qui $raw era [] ed explode() sollevava un
+        // TypeError, così ogni riga veniva contata come fallita pur essendo già
+        // stata salvata ("0 importati, 40 falliti" con 40 prodotti aggiornati).
+        if (! is_string($raw)) {
+            return;
+        }
+
+        $codes = array_values(array_filter(
+            array_map('trim', explode(',', $raw)),
+            static fn (string $code): bool => $code !== '',
+        ));
+
+        // Cella vuota o nessuna coda corrispondente: sync([]) staccherebbe il
+        // prodotto da TUTTE le code, facendolo sparire da ogni fila del POS senza
+        // alcun avviso e senza possibilità di annullare. Meglio non toccare nulla.
+        if ($codes === []) {
+            return;
+        }
+
+        $queuesSelected = Queue::whereIn('comment', $codes)->pluck('id')->toArray();
+        if ($queuesSelected === []) {
+            return;
+        }
+
         /** @var Product $record */
         $record = $this->record;
         $record->queues()->sync($queuesSelected);
-
     }
 }

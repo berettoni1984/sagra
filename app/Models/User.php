@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Permission\Traits\HasRoles;
 
 /**
  * @property int $id
@@ -51,7 +52,14 @@ class User extends Authenticatable implements FilamentUser
     /** @use HasFactory<UserFactory> */
     use HasFactory;
 
+    use HasRoles;
     use Notifiable;
+
+    /** Ruolo con accesso completo (utenti, configurazioni, azzeramento numerazione). */
+    public const ROLE_ADMIN = 'admin';
+
+    /** Ruolo operativo di cassa. */
+    public const ROLE_CASSA = 'cassa';
 
     /**
      * {@inheritDoc}
@@ -85,6 +93,11 @@ class User extends Authenticatable implements FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         return true;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(self::ROLE_ADMIN);
     }
 
     /**

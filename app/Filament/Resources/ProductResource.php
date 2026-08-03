@@ -159,9 +159,7 @@ class ProductResource extends Resource
                         try {
                             $from = Carbon::make(
                                 $data['created_from'],
-                                Config::whereCode('timezone')
-                                    ->first()
-                                    ?->config_value ?: config('app.timezone')
+                                Config::value('timezone') ?: config('app.timezone')
                             )?->timezone(config('app.timezone'));
 
                         } catch (\Throwable $e) {
@@ -170,9 +168,7 @@ class ProductResource extends Resource
                         try {
                             $to = Carbon::make(
                                 $data['created_until'],
-                                Config::whereCode('timezone')
-                                    ->first()
-                                    ?->config_value ?: config('app.timezone')
+                                Config::value('timezone') ?: config('app.timezone')
                             )?->timezone(config('app.timezone'));
                         } catch (\Throwable $e) {
                             $to = null;

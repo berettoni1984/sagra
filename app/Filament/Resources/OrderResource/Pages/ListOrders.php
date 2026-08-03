@@ -16,10 +16,16 @@ class ListOrders extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            // Azzera la numerazione di TUTTE le code: a metà servizio fa ripartire
+            // i numeri da 1 mentre gli ordini già emessi li mantengono, e al
+            // ritiro due scontrini diventano indistinguibili. Solo admin.
             Actions\Action::make('resetNumber')
                 ->label(__('filament.reset_number'))
                 ->icon('heroicon-o-arrow-path')
+                ->visible(fn (): bool => auth()->user()?->isAdmin() ?? false)
                 ->action(function () {
+                    abort_unless(auth()->user()?->isAdmin() ?? false, 403);
+
                     Queue::query()->update([
                         'order_number' => 0,
                         'reset_at' => Carbon::now(),
