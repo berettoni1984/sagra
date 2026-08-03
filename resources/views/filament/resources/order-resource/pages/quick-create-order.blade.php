@@ -77,7 +77,10 @@
                                             {{ __('filament.Out of Stock') }}
                                         @endif
                                     </span>
-                                @else
+                                {{-- Con backorder attivo la giacenza non viene applicata
+                                     (StockService la ignora del tutto), quindi mostrarla
+                                     comunicherebbe un limite che non esiste. --}}
+                                @elseif(! $product['backorder'])
                                     <span class="text-xs mt-1 @if($product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
                                         Stock: {{ $product['remaining_stock'] }}
                                     </span>
