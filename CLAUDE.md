@@ -88,6 +88,14 @@ Resources live in `app/Filament/Resources/*Resource.php`. Filament v5 tables tak
 
 Prefer relationship-based aggregates (`withSum`/`withCount`, which compile to a subquery) or `whereHas` over manual joins in a resource's `->query()` closure — see `ProductResource::table()` for the pattern (it computes `order_items_sum_quantity` via `withSum('orderItems', 'quantity')`, and its date-range filter uses nested `whereHas` instead of joining `orders`/`order_items` onto `products`).
 
+### Health checks
+
+`spatie/laravel-health` is wired up in `app/Providers/HealthServiceProvider.php`. The checks that matter here are `DatabaseCheck`, `RedisCheck` and `HorizonCheck` — during a festival the panel is the only till, so those three failing means sales stop. `DebugModeCheck`, `EnvironmentCheck` and `OptimizedAppCheck` are registered **only in production**, since they fail by definition locally.
+
+The results are served at `/health` (Blade) and `/health/json`, both behind `Authenticate` + `EnsureUserIsAdmin` — the page lists disk usage, Horizon state and packages with known advisories, so it must not be public or visible to cashiers. `routes/console.php` schedules `health:check` and `health:schedule-check-heartbeat` every minute; without the heartbeat `ScheduleCheck` correctly reports that cron is not running.
+
+Note `REDIS_HOST` must be `redis` (the Sail service name), not `127.0.0.1` — with localhost the app cannot reach Redis and **Horizon will not start at all**. This stayed hidden for a long time because the queue, cache and session drivers are all `database`.
+
 ### i18n
 
 All user-facing labels go through `__('filament.xxx')`, with translations in `lang/it` (primary) and `lang/en`.
