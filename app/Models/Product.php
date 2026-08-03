@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Support\Carbon;
 
 /**
  * App\Models\Product
@@ -17,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  * @property string $price
  * @property int $is_disabled
  * @property int $order
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read mixed $label
  *
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Product newModelQuery()
@@ -32,7 +35,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereOrder($value)
  *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\OrderItem> $orderItems
+ * @property-read Collection<int, OrderItem> $orderItems
  * @property-read int|null $order_items_count
  * @property int $stock
  *
@@ -42,16 +45,16 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  *
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Product whereBackorder($value)
  *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Queue> $queues
+ * @property-read Collection<int, Queue> $queues
  * @property-read int|null $queues_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Ingredient> $ingredients
+ * @property-read Collection<int, Ingredient> $ingredients
  * @property-read int|null $ingredients_count
  *
  * @mixin \Eloquent
  */
 class Product extends Model
 {
-    /** @use HasFactory<\Database\Factories\ProductFactory> */
+    /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
     /**

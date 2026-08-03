@@ -5,6 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\QueueResource\Pages;
 use App\Models\Queue;
 use Carbon\Carbon;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -52,8 +56,13 @@ class QueueResource extends Resource
                 Forms\Components\TextInput::make('comment')
                     ->required()
                     ->label(__('filament.Comment')),
+                // La colonna è smallint unsigned: fuori da 0..65535 il database
+                // rifiutava il valore con un errore SQL e una pagina 500.
                 Forms\Components\TextInput::make('order_number')
                     ->numeric()
+                    ->integer()
+                    ->minValue(0)
+                    ->maxValue(65535)
                     ->required()
                     ->default(0)
                     ->label(__('filament.Order Number')),
@@ -100,8 +109,8 @@ class QueueResource extends Resource
                 //
             ])
             ->recordActions([
-                \Filament\Actions\EditAction::make(),
-                \Filament\Actions\Action::make('resetNumber')
+                EditAction::make(),
+                Action::make('resetNumber')
                     ->label(__('filament.reset_number'))
                     ->icon('heroicon-o-arrow-path')
                     ->action(function ($record) {
@@ -114,8 +123,8 @@ class QueueResource extends Resource
                     ->requiresConfirmation(),
             ])
             ->toolbarActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

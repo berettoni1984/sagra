@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
+use App\Models\Order;
 use App\Models\Queue;
 use App\Services\OrderStockService;
 use Filament\Actions\Action;
@@ -18,7 +19,7 @@ class CreateOrder extends CreateRecord
     {
         // Lock della riga coda: senza lock due casse sulla stessa fila leggono
         // lo stesso order_number e stampano due ordini con lo stesso numero.
-        /** @var \App\Models\Queue|null $queue */
+        /** @var Queue|null $queue */
         $queue = Queue::whereKey($data['queue_id'])->lockForUpdate()->first();
         if ($queue) {
             $number = $queue->order_number + 1;
@@ -43,7 +44,7 @@ class CreateOrder extends CreateRecord
 
     public function afterCreate(): void
     {
-        /** @var \App\Models\Order|null $record */
+        /** @var Order|null $record */
         $record = $this->getRecord();
         if (! $record) {
             return;
