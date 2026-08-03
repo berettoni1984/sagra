@@ -33,7 +33,9 @@ class IngredientsRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label(__('filament.Ingredient')),
-                Tables\Columns\TextColumn::make('qty')
+                // qty sta sulla pivot product_ingredient, non su ingredients:
+                // come 'qty' la colonna risultava sempre vuota.
+                Tables\Columns\TextColumn::make('pivot.qty')
                     ->label(__('filament.Quantity')),
             ])
             ->filters([

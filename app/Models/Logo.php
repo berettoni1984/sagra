@@ -36,6 +36,7 @@ class Logo extends Model
      */
     protected $fillable = [
         'path',
+        'is_default',
     ];
 
     /**

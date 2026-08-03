@@ -44,6 +44,7 @@ class Ingredient extends Model
     protected $fillable = [
         'name',
         'stock',
+        'is_disabled',
     ];
 
     /**

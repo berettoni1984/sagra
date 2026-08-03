@@ -8,6 +8,9 @@ Route::get('/order/invoice/{orderId}', [
     OrderInvoiceController::class, 'show',
 ])
     ->name('order.invoice')
+    // Senza vincolo numerico un id non numerico non è convertibile in int e
+    // produce un TypeError (500) invece del 404 di findOrFail.
+    ->whereNumber('orderId')
     ->middleware([
         Authenticate::class,
     ]);

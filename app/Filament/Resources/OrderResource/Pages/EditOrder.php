@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
-use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
+use App\Services\OrderStockService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -23,22 +23,7 @@ class EditOrder extends EditRecord
         return [
             Actions\DeleteAction::make()
                 ->before(static function (Order $record) {
-                    foreach ($record->orderItems as $orderItem) {
-                        $product = $orderItem->product;
-                        if (! $product) {
-                            continue;
-                        }
-                        $product->stock += $orderItem->quantity;
-                        $product->save();
-                        $product->ingredients->each(function (Ingredient $ingredient) use ($orderItem) {
-                            if ($ingredient->is_disabled) {
-                                return;
-                            }
-                            $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
-                            $ingredient->stock += ($orderItem->quantity * $qty);
-                            $ingredient->save();
-                        });
-                    }
+                    app(OrderStockService::class)->restore($record);
                 }),
         ];
     }
@@ -77,23 +62,27 @@ class EditOrder extends EditRecord
 
     protected function afterSave(): void
     {
+        $stock = app(OrderStockService::class);
+
         foreach ($this->qtyChanges as $productId => $qtyChange) {
             $product = Product::find($productId);
             if (! $product) {
                 continue;
             }
+            // Delta con segno: scarica se la quantità è aumentata, ripristina se è
+            // scesa. Sempre lato SQL per non perdere scarichi concorrenti.
             $quantity = $qtyChange['new'] - $qtyChange['old'];
-            $product->stock -= $quantity;
-            $product->save();
-            $product->ingredients->each(function (Ingredient $ingredient) use ($quantity) {
+            $stock->applyDelta($product, -$quantity);
+            $product->ingredients->each(function ($ingredient) use ($quantity, $stock) {
                 if ($ingredient->is_disabled) {
                     return;
                 }
-                $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
-                $ingredient->stock -= ($quantity * $qty);
-                $ingredient->save();
+                $qty = (int) ($ingredient->pivot?->getAttributeValue('qty') ?? 0);
+                if ($qty === 0) {
+                    return;
+                }
+                $stock->applyDelta($ingredient, -($quantity * $qty));
             });
         }
-
     }
 }

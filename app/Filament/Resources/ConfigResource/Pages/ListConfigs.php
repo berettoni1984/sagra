@@ -20,6 +20,10 @@ class ListConfigs extends ListRecords
                 ->label(__('filament.reset_number'))
                 ->icon('heroicon-o-arrow-path')
                 ->action(function () {
+                    // La pagina è già riservata agli admin da ConfigResource::canAccess(),
+                    // ma l'azione è distruttiva: meglio non dipendere solo da quello.
+                    abort_unless(auth()->user()?->isAdmin() ?? false, 403);
+
                     Queue::query()->update([
                         'order_number' => 0,
                         'reset_at' => Carbon::now(),

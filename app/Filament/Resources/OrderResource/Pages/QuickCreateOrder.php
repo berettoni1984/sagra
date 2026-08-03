@@ -70,12 +70,16 @@ class QuickCreateOrder extends Page
 
         $this->items = [];
         $this->note = null;
+        $this->free = false;
+        $this->customTotalPaid = null;
     }
 
     public function getPaid(float|int $totalAmount): string
     {
         if ($this->customTotalPaid !== null) {
-            return number_format($this->customTotalPaid, 2, '.', '');
+            // Il min="0" del form è solo lato client: la proprietà Livewire
+            // può arrivare negativa e finirebbe così com'è in total_paid.
+            return number_format(max(0, $this->customTotalPaid), 2, '.', '');
         }
         if ($this->free) {
             return '0.00';
@@ -154,14 +158,15 @@ class QuickCreateOrder extends Page
         try {
             DB::beginTransaction();
 
+            // Lock della riga coda: senza lock due casse sulla stessa fila
+            // possono leggere lo stesso order_number e creare ordini con numero duplicato.
             /** @var Queue|null $queue */
-            $queue = Queue::find($this->queueId);
+            $queue = Queue::whereKey($this->queueId)->lockForUpdate()->first();
             if (! $queue) {
                 throw new RuntimeException('Queue not found');
             }
 
-            $number = $queue->order_number;
-            $number++;
+            $number = $queue->order_number + 1;
             $queue->order_number = $number;
             $queue->save();
 
@@ -187,18 +192,21 @@ class QuickCreateOrder extends Page
                     'note' => $item['note'],
                 ];
 
-                // Update stock
-                $product->stock -= $item['quantity'];
-                $product->save();
+                // Update stock: decrement() esegue "stock = stock - ?" lato SQL.
+                // Con read-modify-write due ordini concorrenti sullo stesso prodotto
+                // si sovrascrivono a vicenda perdendo uno dei due scarichi.
+                $product->decrement('stock', $item['quantity']);
 
                 // Update ingredients stock
                 $product->ingredients->each(function (Ingredient $ingredient) use ($item) {
                     if ($ingredient->is_disabled) {
                         return;
                     }
-                    $qty = $ingredient->pivot?->getAttributeValue('qty') ?? 0;
-                    $ingredient->stock -= ($item['quantity'] * $qty);
-                    $ingredient->save();
+                    $qty = (int) ($ingredient->pivot?->getAttributeValue('qty') ?? 0);
+                    if ($qty === 0) {
+                        return;
+                    }
+                    $ingredient->decrement('stock', $item['quantity'] * $qty);
                 });
             }
 
@@ -321,7 +329,7 @@ class QuickCreateOrder extends Page
      */
     public function isFreeConfigEnabled(): bool
     {
-        return (bool) \App\Models\Config::whereCode('free')->first()?->config_value;
+        return (bool) \App\Models\Config::value('free');
     }
 
     /**

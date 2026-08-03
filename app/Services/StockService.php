@@ -7,6 +7,26 @@ use App\Models\Product;
 class StockService
 {
     /**
+     * Cache per-richiesta dei prodotti del carrello.
+     *
+     * getTotalIngredientUsedInCart() viene invocato una volta per ogni ingrediente
+     * di ogni prodotto mostrato: senza cache ogni render rifà una find() per ogni
+     * riga di carrello, moltiplicata per prodotti x ingredienti.
+     *
+     * @var array<int, Product|null>
+     */
+    private array $productCache = [];
+
+    private function findProduct(int $productId): ?Product
+    {
+        if (! array_key_exists($productId, $this->productCache)) {
+            $this->productCache[$productId] = Product::with('ingredients')->find($productId);
+        }
+
+        return $this->productCache[$productId];
+    }
+
+    /**
      * Calcola il totale di un ingrediente usato nel carrello
      *
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
@@ -15,7 +35,7 @@ class StockService
     {
         $total = 0;
         foreach ($items as $item) {
-            $product = Product::with('ingredients')->find($item['product_id']);
+            $product = $this->findProduct($item['product_id']);
             if (! $product) {
                 continue;
             }
@@ -103,7 +123,7 @@ class StockService
     public function hasOutOfStockItems(array $items): bool
     {
         foreach ($items as $item) {
-            $product = Product::with('ingredients')->find($item['product_id']);
+            $product = $this->findProduct($item['product_id']);
             if (! $product || $product->backorder) {
                 continue;
             }

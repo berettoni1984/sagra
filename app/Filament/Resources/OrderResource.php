@@ -13,6 +13,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\RawJs;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -33,12 +34,28 @@ class OrderResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-list-bullet';
 
     /**
+     * Ultimo id ordine per utente, risolto una volta per richiesta.
+     *
+     * @var array<int|string, int|null>
+     */
+    private static array $latestOrderIdCache = [];
+
+    /**
      * @param  Order  $record
      */
     public static function canEdit(Model $record): bool
     {
         $userId = auth()->user()?->id;
-        $maxId = Order::where('user_id', $userId)->max('id');
+
+        // canEdit() viene invocato due volte per riga della tabella (ViewAction e
+        // EditAction): senza memoizzazione erano due MAX(id) su tutti gli ordini
+        // per ogni riga, cioè un centinaio di scansioni per pagina.
+        $cacheKey = $userId ?? 'guest';
+        if (! array_key_exists($cacheKey, self::$latestOrderIdCache)) {
+            self::$latestOrderIdCache[$cacheKey] = Order::where('user_id', $userId)->max('id');
+        }
+        $maxId = self::$latestOrderIdCache[$cacheKey];
+
         if (
             $record->id < $maxId ||
             $record->user_id !== $userId) {
@@ -169,18 +186,18 @@ class OrderResource extends Resource
                     ->readOnly(),
                 Forms\Components\Hidden::make('total_paid')
                     ->hidden(fn () => (
-                        (Config::whereCode('change_price')->first()?->config_value) ||
-                        (Config::whereCode('free')->first()?->config_value)
+                        (Config::value('change_price')) ||
+                        (Config::value('free'))
                     )),
                 Forms\Components\TextInput::make('total_paid')
                     ->inlineLabel()
                     ->columnSpan(['default' => 2, 'lg' => 4, 'md' => 4, 'sm' => 2])
                     ->hidden(fn () => ! (
-                        (Config::whereCode('change_price')->first()?->config_value) ||
-                        (Config::whereCode('free')->first()?->config_value)
+                        (Config::value('change_price')) ||
+                        (Config::value('free'))
                     ))
                     ->label(__('filament.Total Paid €'))
-                    ->readOnly(fn (): bool => ! (Config::whereCode('change_price')->first()?->config_value)),
+                    ->readOnly(fn (): bool => ! (Config::value('change_price'))),
                 Forms\Components\Textarea::make('note')
                     ->label(__('filament.Note'))
                     ->inlineLabel()
@@ -189,7 +206,7 @@ class OrderResource extends Resource
                     ->label(__('filament.Free'))
                     ->inlineLabel()
                     ->columnSpan(['default' => 2, 'lg' => 4, 'md' => 4, 'sm' => 2])
-                    ->hidden(fn (): bool => ! (Config::whereCode('free')->first()?->config_value))
+                    ->hidden(fn (): bool => ! (Config::value('free')))
                     ->reactive()
                     ->afterStateUpdated(static function ($get, $set) {
                         if ($get('free')) {
@@ -285,6 +302,10 @@ class OrderResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
+            // La colonna user_id legge $record->user->code tramite formatStateUsing:
+            // non essendo una colonna con notazione a punti, Filament non fa eager
+            // loading e caricava l'utente con una query per riga.
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('user'))
             ->columns([
                 Tables\Columns\TextColumn::make('number')
                     ->sortable()
@@ -298,8 +319,8 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('total_paid')
                     ->money('eur')
                     ->hidden(fn () => ! (
-                        (Config::whereCode('change_price')->first()?->config_value) ||
-                        (Config::whereCode('free')->first()?->config_value)
+                        (Config::value('change_price')) ||
+                        (Config::value('free'))
                     ))
                     ->label(__('filament.Total Paid')),
                 Tables\Columns\TextColumn::make('order_items_count')
@@ -308,7 +329,7 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('filament.created_at_column'))
                     ->sortable()
-                    ->timezone(Config::whereCode('timezone')->first()?->config_value ?: config('app.timezone'))
+                    ->timezone(Config::value('timezone') ?: config('app.timezone'))
                     ->dateTime('H:i d/m/Y'),
                 Tables\Columns\TextColumn::make('user_id')
                     ->sortable()
@@ -330,7 +351,14 @@ class OrderResource extends Resource
             ], position: \Filament\Tables\Enums\RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
+                    // Senza questo hook annullare N ordini errati dall'elenco non
+                    // restituiva nulla a magazzino, e i prodotti restavano
+                    // falsamente esauriti per il resto della serata.
+                    \Filament\Actions\DeleteBulkAction::make()
+                        ->before(static function (\Illuminate\Support\Collection $records) {
+                            /** @var \Illuminate\Support\Collection<int, Order> $records */
+                            app(\App\Services\OrderStockService::class)->restoreMany($records);
+                        }),
                 ]),
             ])
             ->selectCurrentPageOnly(false)
@@ -396,7 +424,7 @@ class OrderResource extends Resource
 
         $options = [];
         if (! $productId) {
-            for ($i = 1; $i <= (int) (Config::whereCode('max_qty')->first()->config_value ?? 15); $i++) {
+            for ($i = 1; $i <= Config::intValue('max_qty', 15); $i++) {
                 $options[(int) $i] = (string) $i;
             }
 
@@ -412,7 +440,7 @@ class OrderResource extends Resource
         $stock = $product->stock ?? 0;
         $backorder = $product->backorder ?? 0;
 
-        for ($i = 1; $i <= (int) (Config::whereCode('max_qty')->first()->config_value ?? 15); $i++) {
+        for ($i = 1; $i <= Config::intValue('max_qty', 15); $i++) {
             $label = $i;
             if (! $backorder && ($i + $qtySel) > ($stock)) {
                 $label .= ' ('.__('filament.Out of Stock').')';
@@ -452,7 +480,7 @@ class OrderResource extends Resource
             ->when($search, fn ($q, $search) => $q->where('products.name', 'like', "%{$search}%"))
             ->get()
             ->pluck('label', 'id');
-        $repeatProducts = Config::whereCode('repeat_products')->first()->config_value ?? 0;
+        $repeatProducts = Config::value('repeat_products') ?? 0;
         $selectedProducts = [];
         if (! $repeatProducts) {
             $selectedProducts = static::getSelectedProducts($get('../../orderItems'), (int) $get('product_id'));
@@ -472,8 +500,32 @@ class OrderResource extends Resource
     {
         $qtyValue = [];
         $qtyIngredientValue = [];
+
+        // Una find() per riga di carrello, dentro un metodo già rivalutato per
+        // ogni riga del repeater: il costo cresceva col quadrato delle righe.
+        // Qui si caricano tutti i prodotti coinvolti in una sola query.
+        $productIds = collect($orderItems)
+            ->pluck('product_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->filter()
+            ->unique()
+            ->all();
+
+        $products = $productIds === []
+            ? collect()
+            : Product::with('ingredients')->findMany($productIds)->keyBy('id');
+
+        // Evita il lazy load di product+ingredients per ogni riga già salvata.
+        $order?->loadMissing('orderItems.product.ingredients');
+
         foreach ($order->orderItems ?? [] as $orderItem) {
             $productIdTmp = $orderItem->product_id;
+            // product_id è nullable (prodotto cancellato dopo l'ordine): come chiave
+            // diventerebbe '' qui e 0 nel ciclo sotto, quindi le due voci non si
+            // riconcilierebbero mai. Senza prodotto non c'è nulla da confrontare.
+            if ($productIdTmp === null) {
+                continue;
+            }
             $quantity = $orderItem->quantity;
             if (! isset($qtyValue[$productIdTmp]['old'])) {
                 $qtyValue[$productIdTmp] = ['old' => 0, 'new' => 0];
@@ -492,7 +544,7 @@ class OrderResource extends Resource
         }
         foreach ($orderItems as $orderItem) {
             $productIdTmp = (int) $orderItem['product_id'];
-            $product = Product::find($productIdTmp);
+            $product = $products->get($productIdTmp);
             $quantity = (int) $orderItem['quantity'];
             if (! isset($qtyValue[$productIdTmp])) {
                 $qtyValue[$productIdTmp] = ['old' => 0, 'new' => 0];
