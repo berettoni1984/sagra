@@ -92,11 +92,20 @@ class OrderManagementService
 
     /**
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
-     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool}
+     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}
      */
-    public function getEnrichedProduct(array $items, Product $product, int $index): array
+    public function getEnrichedProduct(array $items, Product $product, int $index, int $sold = 0): array
     {
-        return $this->enrichmentService->getEnrichedProduct($items, $product, $index);
+        return $this->enrichmentService->getEnrichedProduct($items, $product, $index, $sold);
+    }
+
+    /**
+     * @param  array<int, int>  $productIds
+     * @return array<int, int>
+     */
+    public function getSoldSinceQueueReset(array $productIds): array
+    {
+        return $this->enrichmentService->getSoldSinceQueueReset($productIds);
     }
 
     /**

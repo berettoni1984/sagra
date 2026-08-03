@@ -2,10 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\Logo;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Logo>
+ * @extends Factory<Logo>
  */
 class LogoFactory extends Factory
 {
@@ -17,7 +18,13 @@ class LogoFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'path' => 'logos/'.fake()->unique()->slug(2).'.png',
+            'is_default' => false,
         ];
+    }
+
+    public function isDefault(): static
+    {
+        return $this->state(['is_default' => true]);
     }
 }

@@ -21,14 +21,26 @@ sail npm run dev / build       # Vite frontend assets (Tailwind + Filament theme
 ## Common commands
 
 ```bash
-sail test                              # run full test suite (PHPUnit runner)
-sail artisan test --filter=SomeTest    # run a single test
+sail artisan test                      # run full test suite (Pest)
+sail artisan test --parallel           # same, one database per process — much faster
+sail artisan test --filter=SomeTest    # run a single test file or name
 sail bin phpstan analyse                # static analysis (Larastan, level 8, app/ only — see phpstan.neon)
 sail bin phpmd app text phpmdruleset.xml   # mess detector (excludes tests/, storage/)
 sail bin pint                          # code style (Laravel Pint)
 ```
 
-Note: `pestphp/pest` is a dev dependency but the existing tests (`tests/Unit/ExampleTest.php`, `tests/Feature/ExampleTest.php`) are plain PHPUnit `TestCase` classes — there is no real test coverage of app logic yet, so don't assume behavior is pinned down by tests.
+### Test setup
+
+Tests are **Pest 4** and run against a real MySQL database named `testing` (`phpunit.xml` sets `DB_DATABASE=testing`), not SQLite — the suite asserts on MySQL-specific behaviour (foreign key delete rules, unique constraint violations by error code, `SELECT ... FOR UPDATE`). If the database does not exist yet:
+
+```bash
+docker exec sagra-mysql-1 mysql -uroot -ppassword \
+  -e "CREATE DATABASE testing; GRANT ALL ON \`testing%\`.* TO 'sail'@'%';"
+```
+
+`--parallel` needs `CREATE`/`DROP` on `*.*` for the `sail` user, since Laravel creates one `testing_test_N` database per process. Running several test processes against the *same* database will corrupt each other's state — use `--parallel` (or a distinct `DB_DATABASE`) rather than launching concurrent runs by hand.
+
+`tests/Pest.php` binds `RefreshDatabase` to everything under `Feature` (so migrations, including the one that seeds the `admin`/`cassa` roles, run automatically) and exposes helpers: `admin()`, `cassa()`, `actingAsAdmin()`, `actingAsCassa()`, `userWithRole()`, `setConfig()` (writes a config value *and* flushes the memoized cache), and `countQueries(Closure)` for the N+1 regression tests. Every model has a working factory with useful states (`Product::factory()->backorder()`, `Queue::factory()->resetAt(...)`, `OrderItem::factory()->of($product, $qty)`, …).
 
 ## Architecture
 

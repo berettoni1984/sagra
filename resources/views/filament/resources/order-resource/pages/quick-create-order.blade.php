@@ -78,10 +78,20 @@
                                         @endif
                                     </span>
                                 @else
-                                    <span class="text-xs mt-1 @if($product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
-                                        Stock: {{ $product['remaining_stock'] }}
+                                    {{-- Con backorder attivo la giacenza non viene applicata
+                                         (StockService la ignora del tutto): si mostra un
+                                         trattino invece di un numero che non è un limite
+                                         reale, e non va evidenziato in rosso. --}}
+                                    <span class="text-xs mt-1 @if(! $product['backorder'] && $product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
+                                        {{ __('filament.Stock') }}: {{ $product['backorder'] ? '-' : $product['remaining_stock'] }}
                                     </span>
                                 @endif
+
+                                {{-- Venduti dall'ultimo azzeramento della coda, sommati
+                                     su tutte le code in cui il prodotto è presente. --}}
+                                <span class="text-xs text-gray-400 dark:text-gray-500">
+                                    {{ __('filament.Sold') }}: {{ $product['sold'] }}
+                                </span>
                             </button>
                         @endforeach
                     </div>

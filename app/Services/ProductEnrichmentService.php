@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\OrderItem;
 use App\Models\Product;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProductEnrichmentService
 {
@@ -12,12 +14,48 @@ class ProductEnrichmentService
     ) {}
 
     /**
+     * Quantità vendute per prodotto dall'ultimo reset della coda.
+     *
+     * Ogni riga d'ordine viene confrontata con il reset_at della coda del
+     * proprio ordine, quindi un prodotto presente su più code somma
+     * automaticamente i venduti di ciascuna. Una sola query aggregata per
+     * tutti i prodotti: viene invocata a ogni render della cassa.
+     *
+     * Le code senza reset_at (mai azzerate) contano dall'inizio; gli ordini
+     * annullati non contano, perché la merce è già rientrata a magazzino.
+     *
+     * @param  array<int, int>  $productIds
+     * @return array<int, int>
+     */
+    public function getSoldSinceQueueReset(array $productIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        return OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->leftJoin('queues', 'queues.id', '=', 'orders.queue_id')
+            ->whereIn('order_items.product_id', $productIds)
+            ->whereNull('orders.deleted_at')
+            ->where(static function (Builder $query): void {
+                $query->whereNull('queues.reset_at')
+                    ->orWhereColumn('orders.created_at', '>=', 'queues.reset_at');
+            })
+            ->groupBy('order_items.product_id')
+            ->selectRaw('order_items.product_id as product_id, SUM(order_items.quantity) as sold')
+            ->pluck('sold', 'product_id')
+            ->map(static fn ($sold): int => (int) $sold)
+            ->all();
+    }
+
+    /**
      * Ottiene i dati arricchiti di un prodotto per la visualizzazione
      *
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
-     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool}
+     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}
      */
-    public function getEnrichedProduct(array $items, Product $product, int $index): array
+    public function getEnrichedProduct(array $items, Product $product, int $index, int $sold = 0): array
     {
         $totalInCart = $this->cartService->getTotalInCart($items, $product->id);
         $remainingStock = $this->stockService->getRemainingStock($items, $product->id, $product->stock);
@@ -35,6 +73,7 @@ class ProductEnrichmentService
             'remaining_stock' => $remainingStock,
             'is_out_of_stock' => $isOutOfStock,
             'has_insufficient_ingredients' => $hasInsufficientIngredients && ! $product->backorder,
+            'sold' => $sold,
         ];
     }
 

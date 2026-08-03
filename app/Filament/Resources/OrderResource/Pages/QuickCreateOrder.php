@@ -72,6 +72,8 @@ class QuickCreateOrder extends Page
         $this->note = null;
         $this->free = false;
         $this->customTotalPaid = null;
+        // La coda nuova ha altri prodotti: la mappa dei venduti va ricalcolata.
+        $this->soldCache = null;
     }
 
     public function getPaid(float|int $totalAmount): string
@@ -248,7 +250,17 @@ class QuickCreateOrder extends Page
     }
 
     /**
-     * @return array<int, array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool}>
+     * Venduti per prodotto, risolti una volta per richiesta.
+     *
+     * getProducts() viene invocato più volte per render (dalla vista e da
+     * getProductNumbersMap()) e il dato non dipende dal carrello.
+     *
+     * @var array<int, int>|null
+     */
+    private ?array $soldCache = null;
+
+    /**
+     * @return array<int, array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}>
      */
     public function getProducts(): array
     {
@@ -264,9 +276,20 @@ class QuickCreateOrder extends Page
             ->select('products.*')
             ->get();
 
+        if ($this->soldCache === null) {
+            $this->soldCache = $this->orderService->getSoldSinceQueueReset(
+                $products->pluck('id')->map(static fn ($id): int => (int) $id)->all()
+            );
+        }
+
         $enrichedProducts = [];
         foreach ($products as $index => $product) {
-            $enrichedProducts[] = $this->orderService->getEnrichedProduct($this->items, $product, $index);
+            $enrichedProducts[] = $this->orderService->getEnrichedProduct(
+                $this->items,
+                $product,
+                $index,
+                $this->soldCache[$product->id] ?? 0
+            );
         }
 
         return $enrichedProducts;

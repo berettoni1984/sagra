@@ -57,9 +57,12 @@ class QueueResource extends Resource
                     ->required()
                     ->default(0)
                     ->label(__('filament.Order Number')),
+                // La colonna è nullable e NULL significa "coda mai azzerata":
+                // con il campo obbligatorio non si poteva salvare una modifica a
+                // una coda mai resettata senza inventare una data, falsando il
+                // conteggio dei venduti che parte proprio da reset_at.
                 Forms\Components\DateTimePicker::make('reset_at')
                     ->default(Carbon::now())
-                    ->required()
                     ->label(__('filament.Reset Date')),
                 Forms\Components\Toggle::make('is_disabled')
                     ->label(__('filament.Is Disabled')),
