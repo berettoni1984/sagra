@@ -20,6 +20,11 @@ pest()->extend(TestCase::class)
 
 pest()->extend(TestCase::class)->in('Unit');
 
+// La memoizzazione dei Config è statica e sopravvive al rollback di
+// RefreshDatabase: senza flush il valore scritto da un test resterebbe visibile
+// a quelli successivi, che leggerebbero una configurazione non più nel database.
+pest()->beforeEach(fn () => Config::flushValueCache())->in('Feature', 'Unit');
+
 /*
 |--------------------------------------------------------------------------
 | Helper

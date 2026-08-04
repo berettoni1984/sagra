@@ -88,11 +88,19 @@ class OrderManagementService
         return $this->stockService->hasOutOfStockItems($items);
     }
 
+    /**
+     * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
+     */
+    public function hasLowStockItems(array $items): bool
+    {
+        return $this->stockService->hasLowStockItems($items);
+    }
+
     // ==================== Product Enrichment ====================
 
     /**
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
-     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}
+     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, remaining_units: int|null, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, sold: int}
      */
     public function getEnrichedProduct(array $items, Product $product, int $index, int $sold = 0): array
     {
@@ -111,7 +119,7 @@ class OrderManagementService
     /**
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
      * @param  array<int, int>  $productNumbers
-     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}>
+     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, remaining_stock: int, remaining_units: int|null}>
      */
     public function getSortedEnrichedItems(array $items, array $productNumbers): array
     {

@@ -281,7 +281,7 @@ class QuickCreateOrder extends Page
     private ?array $soldCache = null;
 
     /**
-     * @return array<int, array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}>
+     * @return array<int, array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, remaining_units: int|null, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, sold: int}>
      */
     public function getProducts(): array
     {
@@ -335,7 +335,7 @@ class QuickCreateOrder extends Page
     /**
      * Ottiene tutti gli item del carrello ordinati e arricchiti
      *
-     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}>
+     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, remaining_stock: int, remaining_units: int|null}>
      */
     public function getSortedEnrichedItems(): array
     {
@@ -350,6 +350,14 @@ class QuickCreateOrder extends Page
     public function hasOutOfStockItems(): bool
     {
         return $this->orderService->hasOutOfStockItems($this->items);
+    }
+
+    /**
+     * Verifica se ci sono prodotti in scorta bassa nel carrello
+     */
+    public function hasLowStockItems(): bool
+    {
+        return $this->orderService->hasLowStockItems($this->items);
     }
 
     /**

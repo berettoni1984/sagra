@@ -95,6 +95,132 @@ it('considera fuori stock un prodotto con stock disponibile ma ingredienti insuf
         ->and($this->stock->isProductOutOfStock($items, $product))->toBeTrue();
 });
 
+// ==================== scorta bassa ====================
+
+it('nasce con l avviso di scorta bassa disattivato', function () {
+    // La migrazione crea low_stock_threshold a 0: chi non lo configura non deve
+    // vedere nulla di nuovo in cassa.
+    $product = Product::factory()->create(['stock' => 1]);
+
+    expect($this->stock->getLowStockThreshold())->toBe(0)
+        ->and($this->stock->isProductLowStock([], $product))->toBeFalse();
+});
+
+it('non avvisa di scorta bassa con una soglia non numerica o negativa', function (string $soglia) {
+    setConfig('low_stock_threshold', $soglia);
+    $product = Product::factory()->create(['stock' => 1]);
+
+    expect($this->stock->getLowStockThreshold())->toBe(0)
+        ->and($this->stock->isProductLowStock([], $product))->toBeFalse();
+})->with(['', 'tre', '-5']);
+
+it('avvisa quando il rimanente arriva alla soglia', function (int $inCarrello, bool $atteso) {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 6]);
+
+    expect($this->stock->isProductLowStock([stockCartRow($product->id, $inCarrello)], $product))->toBe($atteso);
+})->with([
+    // 6 - 2 = 4 pezzi: sopra soglia, nessun avviso
+    [2, false],
+    // 6 - 3 = 3 pezzi: soglia inclusa
+    [3, true],
+    [5, true],
+    // 6 - 6 = 0 pezzi: ultimo pezzo venduto, ancora avviso e non alert
+    [6, true],
+]);
+
+it('lascia vincere l alert di esaurito sull avviso di scorta bassa', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 2]);
+
+    $items = [stockCartRow($product->id, 3)];
+
+    expect($this->stock->isProductOutOfStock($items, $product))->toBeTrue()
+        ->and($this->stock->isProductLowStock($items, $product))->toBeFalse();
+});
+
+it('non avvisa mai di scorta bassa un prodotto in backorder', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->backorder()->create(['stock' => 1]);
+    $ingredient = Ingredient::factory()->create(['stock' => 1]);
+    $product->ingredients()->attach($ingredient->id, ['qty' => 1]);
+    $product->load('ingredients');
+
+    expect($this->stock->getRemainingUnits([], $product))->toBeNull()
+        ->and($this->stock->isProductLowStock([], $product))->toBeFalse()
+        ->and($this->stock->hasLowIngredients([], $product))->toBeFalse();
+});
+
+it('conta come rimanenti le unita ottenibili dagli ingredienti', function () {
+    setConfig('low_stock_threshold', '3');
+    // Giacenza abbondante ma un ingrediente da 7 pezzi con pivot qty 2: bastano
+    // per 3 unità, non per 3,5.
+    $product = Product::factory()->create(['stock' => 100]);
+    $ingredient = Ingredient::factory()->create(['stock' => 7]);
+    $product->ingredients()->attach($ingredient->id, ['qty' => 2]);
+    $product->load('ingredients');
+
+    expect($this->stock->getRemainingUnits([], $product))->toBe(3)
+        ->and($this->stock->isProductLowStock([], $product))->toBeTrue()
+        ->and($this->stock->hasLowIngredients([], $product))->toBeTrue();
+});
+
+it('sottrae il consumo del carrello dalle unita ottenibili dagli ingredienti', function () {
+    setConfig('low_stock_threshold', '2');
+    $product = Product::factory()->create(['stock' => 100]);
+    $ingredient = Ingredient::factory()->create(['stock' => 10]);
+    $product->ingredients()->attach($ingredient->id, ['qty' => 1]);
+    $product->load('ingredients');
+
+    // Fuori carrello ne restano 10: nessun avviso. Con 8 nel carrello ne restano
+    // 2 e l'avviso scatta.
+    expect($this->stock->isProductLowStock([], $product))->toBeFalse()
+        ->and($this->stock->isProductLowStock([stockCartRow($product->id, 8)], $product))->toBeTrue();
+});
+
+it('ignora gli ingredienti disabilitati e quelli a qty zero nel calcolo del rimanente', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 50]);
+    $disabilitato = Ingredient::factory()->create(['stock' => 1, 'is_disabled' => true]);
+    $senzaConsumo = Ingredient::factory()->create(['stock' => 1]);
+    $product->ingredients()->attach($disabilitato->id, ['qty' => 1]);
+    $product->ingredients()->attach($senzaConsumo->id, ['qty' => 0]);
+    $product->load('ingredients');
+
+    expect($this->stock->getRemainingUnits([], $product))->toBe(50)
+        ->and($this->stock->isProductLowStock([], $product))->toBeFalse()
+        ->and($this->stock->hasLowIngredients([], $product))->toBeFalse();
+});
+
+it('attribuisce la scorta bassa al prodotto quando gli ingredienti abbondano', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 2]);
+    $ingredient = Ingredient::factory()->create(['stock' => 500]);
+    $product->ingredients()->attach($ingredient->id, ['qty' => 1]);
+    $product->load('ingredients');
+
+    expect($this->stock->isProductLowStock([], $product))->toBeTrue()
+        ->and($this->stock->hasLowIngredients([], $product))->toBeFalse();
+});
+
+it('segnala la scorta bassa del carrello solo con la soglia attiva', function () {
+    $product = Product::factory()->create(['stock' => 3]);
+    $items = [stockCartRow($product->id, 1)];
+
+    expect($this->stock->hasLowStockItems($items))->toBeFalse();
+
+    setConfig('low_stock_threshold', '3');
+
+    expect($this->stock->hasLowStockItems($items))->toBeTrue();
+});
+
+it('non segnala la scorta bassa del carrello quando tutte le righe abbondano', function () {
+    setConfig('low_stock_threshold', '2');
+    $product = Product::factory()->create(['stock' => 20]);
+
+    expect($this->stock->hasLowStockItems([stockCartRow($product->id, 3)]))->toBeFalse();
+});
+
 // ==================== hasInsufficientIngredients ====================
 
 it('moltiplica il pivot qty per la quantita in carrello', function () {

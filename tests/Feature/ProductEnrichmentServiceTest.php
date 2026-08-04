@@ -47,8 +47,8 @@ it('arricchisce un prodotto con numero progressivo e venduti', function () {
 
     expect(array_keys($enriched))->toBe([
         'id', 'name', 'price', 'stock', 'backorder', 'number',
-        'total_in_cart', 'remaining_stock', 'is_out_of_stock',
-        'has_insufficient_ingredients', 'sold',
+        'total_in_cart', 'remaining_stock', 'remaining_units', 'is_out_of_stock',
+        'is_low_stock', 'has_insufficient_ingredients', 'has_low_ingredients', 'sold',
     ])
         ->and($enriched['id'])->toBe($product->id)
         ->and($enriched['name'])->toBe('Panino')
@@ -88,6 +88,35 @@ it('segnala nel prodotto arricchito lo sforamento di stock e ingredienti', funct
         ->and($enriched['has_insufficient_ingredients'])->toBeTrue();
 });
 
+it('segnala nel prodotto arricchito la scorta bassa senza esaurito', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 5]);
+
+    $enriched = $this->enrichment->getEnrichedProduct([enrichCartRow($product->id, 2)], $product, 0);
+
+    expect($enriched['remaining_units'])->toBe(3)
+        ->and($enriched['is_low_stock'])->toBeTrue()
+        ->and($enriched['has_low_ingredients'])->toBeFalse()
+        ->and($enriched['is_out_of_stock'])->toBeFalse();
+});
+
+it('attribuisce la scorta bassa del prodotto arricchito agli ingredienti', function () {
+    setConfig('low_stock_threshold', '3');
+    // Giacenza abbondante, ma l'ingrediente basta solo per altre 2 unità.
+    $product = Product::factory()->create(['stock' => 100]);
+    $ingredient = Ingredient::factory()->create(['stock' => 4]);
+    $product->ingredients()->attach($ingredient->id, ['qty' => 2]);
+    $product->load('ingredients');
+
+    $enriched = $this->enrichment->getEnrichedProduct([], $product, 0);
+
+    expect($enriched['remaining_stock'])->toBe(100)
+        ->and($enriched['remaining_units'])->toBe(2)
+        ->and($enriched['is_low_stock'])->toBeTrue()
+        ->and($enriched['has_low_ingredients'])->toBeTrue()
+        ->and($enriched['is_out_of_stock'])->toBeFalse();
+});
+
 it('azzera le segnalazioni sul prodotto arricchito in backorder', function () {
     $product = Product::factory()->backorder()->create(['stock' => 0]);
     $ingredient = Ingredient::factory()->exhausted()->create();
@@ -98,8 +127,11 @@ it('azzera le segnalazioni sul prodotto arricchito in backorder', function () {
 
     expect($enriched['backorder'])->toBeTrue()
         ->and($enriched['remaining_stock'])->toBe(-5)
+        ->and($enriched['remaining_units'])->toBeNull()
         ->and($enriched['is_out_of_stock'])->toBeFalse()
-        ->and($enriched['has_insufficient_ingredients'])->toBeFalse();
+        ->and($enriched['is_low_stock'])->toBeFalse()
+        ->and($enriched['has_insufficient_ingredients'])->toBeFalse()
+        ->and($enriched['has_low_ingredients'])->toBeFalse();
 });
 
 // ==================== getSoldSinceQueueReset ====================

@@ -34,9 +34,13 @@
                             <button
                                 type="button"
                                 wire:click="addProduct({{ $product['id'] }})"
+                                {{-- Esaurito e scorta bassa si escludono a vicenda
+                                     (isProductLowStock() è falso a residuo negativo):
+                                     sotto zero comanda il rosso. --}}
                                 @class([
                                     'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all',
-                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => !$product['is_out_of_stock'],
+                                    'border-gray-200 hover:border-primary-500 hover:bg-primary-50 dark:border-gray-700 dark:hover:border-primary-400 dark:hover:bg-primary-950' => !$product['is_out_of_stock'] && !$product['is_low_stock'],
+                                    'border-amber-500 bg-amber-50 hover:border-amber-600 hover:bg-amber-100 dark:border-amber-500 dark:bg-amber-950 dark:hover:border-amber-400 dark:hover:bg-amber-900' => $product['is_low_stock'],
                                     'border-red-500 bg-red-50 hover:border-red-600 hover:bg-red-100 dark:border-red-600 dark:bg-red-950 dark:hover:border-red-500 dark:hover:bg-red-900' => $product['is_out_of_stock'],
                                 ])
                             >
@@ -60,6 +64,11 @@
                                         class="absolute top-8 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-600 rounded-full dark:bg-red-500">
                                         ⚠️
                                     </span>
+                                @elseif($product['is_low_stock'])
+                                    <span
+                                        class="absolute top-8 right-1 flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-amber-500 rounded-full dark:bg-amber-600">
+                                        ⚠️
+                                    </span>
                                 @endif
 
                                 <span
@@ -78,11 +87,25 @@
                                         @endif
                                     </span>
                                 @else
+                                    {{-- Scorta bassa: il numero è quello delle unità
+                                         ancora vendibili, che con un ingrediente agli
+                                         sgoccioli è più basso della giacenza mostrata
+                                         sotto. --}}
+                                    @if($product['is_low_stock'])
+                                        <span class="text-xs text-amber-700 dark:text-amber-300 mt-1 font-bold uppercase">
+                                            @if($product['has_low_ingredients'])
+                                                {{ __('filament.Ingredient Low Stock') }}
+                                            @else
+                                                {{ __('filament.Low Stock') }}
+                                            @endif
+                                            : {{ $product['remaining_units'] }}
+                                        </span>
+                                    @endif
                                     {{-- Con backorder attivo la giacenza non viene applicata
                                          (StockService la ignora del tutto): si mostra un
                                          trattino invece di un numero che non è un limite
                                          reale, e non va evidenziato in rosso. --}}
-                                    <span class="text-xs mt-1 @if(! $product['backorder'] && $product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @else text-gray-400 dark:text-gray-500 @endif">
+                                    <span class="text-xs mt-1 @if(! $product['backorder'] && $product['remaining_stock'] < 0) text-red-600 dark:text-red-400 font-bold @elseif($product['is_low_stock']) text-amber-700 dark:text-amber-300 font-bold @else text-gray-400 dark:text-gray-500 @endif">
                                         {{ __('filament.Stock') }}: {{ $product['backorder'] ? '-' : $product['remaining_stock'] }}
                                     </span>
                                 @endif
@@ -119,12 +142,14 @@
                                 $rowTotal = $enrichedItem['row_total'];
                                 $productNumber = $enrichedItem['product_number'];
                                 $isOutOfStock = $enrichedItem['is_out_of_stock'];
+                                $isLowStock = $enrichedItem['is_low_stock'];
                             @endphp
                             <div
                                 wire:key="item-{{ $itemId }}"
                                 @class([
                                     'flex flex-col gap-2 p-3 rounded-lg',
-                                    'bg-gray-50 dark:bg-gray-800' => !$isOutOfStock,
+                                    'bg-gray-50 dark:bg-gray-800' => !$isOutOfStock && !$isLowStock,
+                                    'bg-amber-50 border-2 border-amber-300 dark:bg-amber-950 dark:border-amber-700' => $isLowStock,
                                     'bg-red-50 border-2 border-red-300 dark:bg-red-950 dark:border-red-700' => $isOutOfStock,
                                 ])
                             >
@@ -143,6 +168,17 @@
                                                 <span
                                                     class="inline-flex items-center px-2 py-0.5 text-xs font-bold text-red-700 bg-red-200 rounded-full dark:text-red-200 dark:bg-red-800 shrink-0">
                                                     ⚠️ {{ __('filament.Out of Stock') }}
+                                                </span>
+                                            @elseif($isLowStock)
+                                                <span
+                                                    class="inline-flex items-center px-2 py-0.5 text-xs font-bold text-amber-800 bg-amber-200 rounded-full dark:text-amber-100 dark:bg-amber-800 shrink-0">
+                                                    ⚠️
+                                                    @if($enrichedItem['has_low_ingredients'])
+                                                        {{ __('filament.Ingredient Low Stock') }}
+                                                    @else
+                                                        {{ __('filament.Low Stock') }}
+                                                    @endif
+                                                    : {{ $enrichedItem['remaining_units'] }}
                                                 </span>
                                             @endif
                                         </div>
@@ -227,13 +263,28 @@
 
                     {{-- Order Total --}}
                     <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        {{-- Rosso per l'esaurito e ambra per la scorta bassa, come le
+                             righe e i pulsanti prodotto: il giallo di prima era
+                             indistinguibile dall'avviso di scorta bassa. --}}
                         @if($this->hasOutOfStockItems())
                             <div
-                                class="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg dark:bg-yellow-950 dark:border-yellow-700">
+                                class="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg dark:bg-red-950 dark:border-red-700">
                                 <div class="flex items-center gap-2 text-sm">
-                                    <span class="text-yellow-700 dark:text-yellow-300">⚠️</span>
-                                    <span class="font-medium text-yellow-800 dark:text-yellow-200">
+                                    <span class="text-red-700 dark:text-red-300">⚠️</span>
+                                    <span class="font-medium text-red-800 dark:text-red-200">
                                         {{ __('filament.This order contains out of stock items') }}
+                                    </span>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($this->hasLowStockItems())
+                            <div
+                                class="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg dark:bg-amber-950 dark:border-amber-700">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-amber-700 dark:text-amber-300">⚠️</span>
+                                    <span class="font-medium text-amber-800 dark:text-amber-200">
+                                        {{ __('filament.This order contains low stock items') }}
                                     </span>
                                 </div>
                             </div>
