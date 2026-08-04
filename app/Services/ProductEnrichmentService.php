@@ -53,7 +53,7 @@ class ProductEnrichmentService
      * Ottiene i dati arricchiti di un prodotto per la visualizzazione
      *
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
-     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, sold: int}
+     * @return array{id: int, name: string, price: string, stock: int, backorder: bool, number: int, total_in_cart: int, remaining_stock: int, remaining_units: int|null, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, sold: int}
      */
     public function getEnrichedProduct(array $items, Product $product, int $index, int $sold = 0): array
     {
@@ -61,6 +61,11 @@ class ProductEnrichmentService
         $remainingStock = $this->stockService->getRemainingStock($items, $product->id, $product->stock);
         $hasInsufficientIngredients = $this->stockService->hasInsufficientIngredients($items, $product);
         $isOutOfStock = $this->stockService->isProductOutOfStock($items, $product);
+        $isLowStock = $this->stockService->isProductLowStock($items, $product);
+        $hasLowIngredients = $this->stockService->hasLowIngredients($items, $product);
+        // Unità davvero vendibili: remaining_stock guarda solo la giacenza del
+        // prodotto, questo tiene conto anche degli ingredienti.
+        $remainingUnits = $this->stockService->getRemainingUnits($items, $product);
 
         return [
             'id' => $product->id,
@@ -71,8 +76,11 @@ class ProductEnrichmentService
             'number' => $index + 1,
             'total_in_cart' => $totalInCart,
             'remaining_stock' => $remainingStock,
+            'remaining_units' => $remainingUnits,
             'is_out_of_stock' => $isOutOfStock,
+            'is_low_stock' => $isLowStock,
             'has_insufficient_ingredients' => $hasInsufficientIngredients && ! $product->backorder,
+            'has_low_ingredients' => $hasLowIngredients,
             'sold' => $sold,
         ];
     }
@@ -83,7 +91,7 @@ class ProductEnrichmentService
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
      * @param  array{item_id: string, product_id: int, quantity: int, note: string|null}  $item
      * @param  array<int, int>  $productNumbers
-     * @return array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}
+     * @return array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, remaining_stock: int, remaining_units: int|null}
      */
     public function getEnrichedItem(array $items, array $item, int $originalIndex, array $productNumbers): array
     {
@@ -91,14 +99,20 @@ class ProductEnrichmentService
 
         $rowTotal = 0;
         $remainingStock = 0;
+        $remainingUnits = null;
         $isOutOfStock = false;
+        $isLowStock = false;
         $hasInsufficientIngredients = false;
+        $hasLowIngredients = false;
 
         if ($product) {
             $rowTotal = ((float) $product->price) * $item['quantity'];
             $remainingStock = $this->stockService->getRemainingStock($items, $item['product_id'], $product->stock);
+            $remainingUnits = $this->stockService->getRemainingUnits($items, $product);
             $hasInsufficientIngredients = $this->stockService->hasInsufficientIngredients($items, $product);
             $isOutOfStock = ! $product->backorder && ($remainingStock < 0 || $hasInsufficientIngredients);
+            $isLowStock = $this->stockService->isProductLowStock($items, $product);
+            $hasLowIngredients = $this->stockService->hasLowIngredients($items, $product);
         }
 
         return [
@@ -110,8 +124,11 @@ class ProductEnrichmentService
             'row_total' => $rowTotal,
             'product_number' => $productNumbers[$item['product_id']] ?? 0,
             'is_out_of_stock' => $isOutOfStock,
+            'is_low_stock' => $isLowStock,
             'has_insufficient_ingredients' => $hasInsufficientIngredients && $product && ! $product->backorder,
+            'has_low_ingredients' => $hasLowIngredients,
             'remaining_stock' => $remainingStock,
+            'remaining_units' => $remainingUnits,
         ];
     }
 
@@ -120,7 +137,7 @@ class ProductEnrichmentService
      *
      * @param  array<int, array{item_id: string, product_id: int, quantity: int, note: string|null}>  $items
      * @param  array<int, int>  $productNumbers
-     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, has_insufficient_ingredients: bool, remaining_stock: int}>
+     * @return array<int, array{item: mixed, item_id: string, original_index: int, sort_order: int, product: ?Product, row_total: float, product_number: int, is_out_of_stock: bool, is_low_stock: bool, has_insufficient_ingredients: bool, has_low_ingredients: bool, remaining_stock: int, remaining_units: int|null}>
      */
     public function getSortedEnrichedItems(array $items, array $productNumbers): array
     {

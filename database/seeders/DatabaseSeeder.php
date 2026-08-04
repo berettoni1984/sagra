@@ -80,6 +80,17 @@ class DatabaseSeeder extends Seeder
                 'comment' => 'quantità massima di prodotti ordinabili per ordine',
             ]
         );
+        Config::firstOrCreate(
+            [
+                'code' => 'low_stock_threshold',
+            ],
+            [
+                // 0 = avviso disattivato: sotto zero comanda già l'alert di
+                // esaurito, quindi la soglia va decisa da chi gestisce la sagra.
+                'config_value' => '0',
+                'comment' => 'numero di pezzi rimasti sotto il quale la cassa avvisa (scorta bassa), 0 disattiva',
+            ]
+        );
 
     }
 }

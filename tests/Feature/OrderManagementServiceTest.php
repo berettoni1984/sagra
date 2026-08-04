@@ -139,6 +139,23 @@ it('delega hasOutOfStockItems allo StockService', function () {
         ->toBeFalse();
 });
 
+it('delega hasLowStockItems allo StockService', function () {
+    setConfig('low_stock_threshold', '3');
+    $product = Product::factory()->create(['stock' => 10]);
+
+    // 10 - 7 = 3 pezzi, cioè la soglia; con 1 solo pezzo nel carrello ne
+    // restano 9 e non c'è nulla da segnalare.
+    $agliUltimi = [facadeCartRow($product->id, 7)];
+    $abbondante = [facadeCartRow($product->id, 1)];
+
+    expect($this->manager->hasLowStockItems($agliUltimi))
+        ->toBe((new StockService)->hasLowStockItems($agliUltimi))
+        ->toBeTrue()
+        ->and($this->manager->hasLowStockItems($abbondante))
+        ->toBe((new StockService)->hasLowStockItems($abbondante))
+        ->toBeFalse();
+});
+
 // ==================== Enrichment ====================
 
 it('delega getEnrichedProduct al ProductEnrichmentService', function () {
