@@ -5,6 +5,10 @@ services:
             dockerfile: Dockerfile
             args:
                 WWWGROUP: '${WWWGROUP}'
+                # Node 24 e' la linea LTS: le versioni dispari (25) sono
+                # "Current" e non ricevono manutenzione a lungo termine.
+                # Vite 8 richiede >= 22.12, quindi qui siamo coperti.
+                NODE_VERSION: '24'
         image: sail-8.5/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
