@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\QueueFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property int $order_number
  * @property Carbon|null $reset_at
  * @property bool $is_disabled
+ * @property int $order
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  *
@@ -31,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereIsDisabled($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereOrder($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereOrderNumber($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereResetAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereUpdatedAt($value)
@@ -40,9 +43,6 @@ use Illuminate\Support\Carbon;
  * @property-read string $label
  * @property-read Collection<int, Product> $products
  * @property-read int|null $products_count
- * @property bool $is_default
- *
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Queue whereIsDefault($value)
  *
  * @mixin \Eloquent
  */
@@ -60,7 +60,7 @@ class Queue extends Model
         'order_number',
         'reset_at',
         'is_disabled',
-        'is_default',
+        'order',
     ];
 
     /**
@@ -69,11 +69,41 @@ class Queue extends Model
     protected $casts = [
         'reset_at' => 'datetime',
         'is_disabled' => 'boolean',
-        'is_default' => 'boolean',
+        'order' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
 
     ];
+
+    /**
+     * Le code nell'ordine deciso dalla colonna `order` (l'id fa da spareggio
+     * quando due code condividono la stessa posizione).
+     *
+     * @return Builder<Queue>
+     */
+    public static function ordered(): Builder
+    {
+        return self::query()
+            ->orderBy('order')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return Builder<Queue>
+     */
+    public static function enabledOrdered(): Builder
+    {
+        return self::ordered()->whereIsDisabled(false);
+    }
+
+    /**
+     * La coda preselezionata in cassa: non c'e' un flag, e' semplicemente la
+     * prima coda abilitata secondo l'ordinamento della tabella.
+     */
+    public static function defaultQueue(): ?self
+    {
+        return self::enabledOrdered()->first();
+    }
 
     /**
      * @return HasMany<Order,$this>

@@ -158,7 +158,7 @@ class OrderItemResource extends Resource
                     ),
                 Tables\Filters\SelectFilter::make('orders.queue_id')
                     ->label(__('filament.Queue'))
-                    ->options(fn () => Queue::all()->pluck('label', 'id'))
+                    ->options(fn () => Queue::ordered()->get()->pluck('label', 'id'))
                     ->searchable()
                     ->multiple()
                     ->getSearchResultsUsing(fn ($search) => Queue::where('name', 'like', "%{$search}%")

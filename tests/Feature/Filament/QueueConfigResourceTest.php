@@ -21,6 +21,48 @@ it('elenca le code', function () {
     Livewire::test(ListQueues::class)->assertCanSeeTableRecords($code);
 });
 
+it('elenca le code ordinate per la colonna order', function () {
+    Queue::query()->delete();
+    $terza = Queue::factory()->atOrder(3)->create();
+    $prima = Queue::factory()->atOrder(1)->create();
+    $seconda = Queue::factory()->atOrder(2)->create();
+
+    Livewire::test(ListQueues::class)
+        ->assertCanSeeTableRecords([$prima, $seconda, $terza], inOrder: true);
+});
+
+it('riordinando aggiorna la colonna order delle code', function () {
+    Queue::query()->delete();
+    $a = Queue::factory()->atOrder(1)->create();
+    $b = Queue::factory()->atOrder(2)->create();
+    $c = Queue::factory()->atOrder(3)->create();
+
+    Livewire::test(ListQueues::class)->call('reorderTable', [$c->id, $a->id, $b->id]);
+
+    expect($c->fresh()->order)->toBe(1)
+        ->and($a->fresh()->order)->toBe(2)
+        ->and($b->fresh()->order)->toBe(3);
+});
+
+it('la coda predefinita e la prima abilitata in ordine di tabella', function () {
+    Queue::query()->delete();
+    $disabilitata = Queue::factory()->disabled()->atOrder(1)->create();
+    $prima = Queue::factory()->atOrder(2)->create();
+    Queue::factory()->atOrder(3)->create();
+
+    // la disabilitata ha la posizione più bassa ma non è selezionabile in cassa
+    expect(Queue::defaultQueue()?->id)->toBe($prima->id)
+        ->and($disabilitata->fresh())->not->toBeNull();
+});
+
+it('a parita di posizione la coda predefinita e quella creata prima', function () {
+    Queue::query()->delete();
+    $prima = Queue::factory()->atOrder(0)->create();
+    Queue::factory()->atOrder(0)->create();
+
+    expect(Queue::defaultQueue()?->id)->toBe($prima->id);
+});
+
 it('crea una coda dal form', function () {
     Livewire::test(CreateQueue::class)
         ->fillForm(['name' => 'GRIGLIA', 'comment' => 'griglia', 'order_number' => 0])

@@ -69,8 +69,16 @@ class LogoResource extends Resource
                     ->maxSize(1024)
                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml'])
                     ->columnSpanFull(),
-                Forms\Components\Toggle::make('is_default')
-                    ->label(__('filament.Is Default')),
+                // La posizione si cambia trascinando le righe in elenco: qui è
+                // solo in lettura, come per i prodotti.
+                Forms\Components\TextInput::make('order')
+                    ->label(__('filament.order_column'))
+                    ->helperText(__('filament.logo_order_hint'))
+                    ->readOnly()
+                    ->numeric()
+                    ->default(static function () {
+                        return (int) Logo::max('order') + 1;
+                    }),
             ]);
     }
 
@@ -78,21 +86,20 @@ class LogoResource extends Resource
     {
 
         return $table
+            // L'ordine delle righe decide il logo stampato sugli scontrini: il
+            // primo vince, non c'è più un flag "default".
+            ->authorizeReorder(true)
+            ->reorderable('order')
+            ->defaultSort('order', 'asc')
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable()
                     ->label(__('filament.ID')),
+                Tables\Columns\TextColumn::make('order')
+                    ->label(__('filament.order_column')),
                 Tables\Columns\TextColumn::make('path')
                     ->copyable()
                     ->label(__('filament.Path')),
-                Tables\Columns\ToggleColumn::make('is_default')
-                    ->label(__('filament.Is Default'))
-                    ->afterStateUpdated(static function ($state, $record) {
-                        if ($state) {
-                            Logo::where('id', '!=', $record->id)
-                                ->update(['is_default' => false]);
-                        }
-                    }),
             ])
             ->filters([
                 //

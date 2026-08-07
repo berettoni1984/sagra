@@ -47,12 +47,15 @@ docker exec sagra-mysql-1 mysql -uroot -ppassword \
 ### Domain model
 
 - `Queue` — an independent ordering line ("Fila 1", "Fila 2", ...). Holds its own `order_number` counter, incremented per created order, so numbering is per-queue, not global. `Product`s are assigned to queues via a `product_queue` pivot (many-to-many), so different lines can sell different subsets of products.
+- **There is no "default" flag** on `Queue` or `Logo`: both tables carry an `order` column driven by Filament's drag-and-drop `->reorderable('order')`, and the *lowest* position wins. Read them through the model helpers — `Queue::defaultQueue()` (first **enabled** queue, ties broken by `id`), `Queue::ordered()` / `Queue::enabledOrdered()` for dropdown lists, `Logo::defaultLogo()` for the logo printed on tickets — never `whereIsDefault(true)`, which no longer exists.
 - `Order` → `hasMany` `OrderItem`. `OrderItem` snapshots product name/price/quantity/amount at creation time (not a live reference), and belongs to `Product` (nullable — product can later be deleted).
 - `Product` ↔ `Ingredient` many-to-many via `product_ingredient` pivot with a `qty` column (how much of that ingredient one unit of the product consumes).
 - `Config` is a key/value settings table used for the app timezone, `max_qty`, and toggles like `free` (no-payment) and `change_price`. **Read it via `Config::value('code')` / `Config::intValue('code', $default)`**, never `Config::whereCode(...)->first()->config_value` — the former memoizes per request/job (the raw form was being re-queried once per exported row and twice per repeater row) and `intValue` floors the result so a blank or non-numeric value can't collapse a loop bound to zero. The cache self-invalidates on save/delete and is flushed at the start of every queued job.
 - `Order` and `OrderItem` use `SoftDeletes`; deleting an `Order` cascades to soft-delete its `orderItems` (see `Order::booted()`).
 
 ### Order creation flow
+
+Orders are created **only** from the quick till: `OrderResource` has no `create` page (the classic Filament create form was removed), so `ListOrders` and the table's empty state link to `quick-create` instead of a `CreateAction`. `OrderResource::form()` is now used for edit/view/print only — its `queue_id` is a `Hidden` field, the queue is chosen in the till.
 
 `QuickCreateOrder` (`app/Filament/Resources/OrderResource/Pages/QuickCreateOrder.php`) is a Filament/Livewire page holding the in-progress cart as plain component state — **not** Eloquent models:
 
@@ -76,7 +79,7 @@ Several cashiers use this simultaneously on one database, so every write to a sh
 - **Per-queue order numbering** must read the counter under a row lock — `Queue::whereKey($id)->lockForUpdate()->first()` inside the transaction. A plain `find()` lets two tills read the same `order_number` and print two tickets with the same number.
 - **Stock changes** must go through `increment()`/`decrement()` (which emit `stock = stock - ?` in SQL), never `$model->stock -= $n; $model->save()`. The read-modify-write form silently loses one of two concurrent adjustments.
 
-Both order-creation paths need this (`QuickCreateOrder::createOrder()` and `CreateOrder::mutateFormDataBeforeCreate()`/`afterCreate()`), plus `EditOrder`'s save and delete hooks.
+This applies to `QuickCreateOrder::createOrder()` — the only creation path left — plus `EditOrder`'s save and delete hooks.
 
 ### Importer: read cast values, not raw CSV keys
 

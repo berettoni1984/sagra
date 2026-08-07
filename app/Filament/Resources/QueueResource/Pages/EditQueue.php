@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\QueueResource\Pages;
 
 use App\Filament\Resources\QueueResource;
-use App\Models\Queue;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -16,17 +15,5 @@ class EditQueue extends EditRecord
         return [
             Actions\DeleteAction::make(),
         ];
-    }
-
-    protected function afterSave(): void
-    {
-
-        /** @var Queue $queue */
-        $queue = $this->record;
-        if ($queue->is_default) {
-            Queue::where('is_default', true)
-                ->where('id', '!=', $queue->id)
-                ->update(['is_default' => false]);
-        }
     }
 }

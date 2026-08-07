@@ -16,7 +16,8 @@ class OrderInvoiceController extends Controller
         $order = Order::findOrFail($orderId);
         $print = (bool) request()->query('print', '0');
         $name = Config::value('name') ?? '';
-        $logoPath = Logo::whereIsDefault(true)->first()->path ?? null;
+        // Il logo stampato è il primo in ordine di tabella, non un flag.
+        $logoPath = Logo::defaultLogo()?->path;
         if ($logoPath) {
             $logoPath = asset('storage/'.$logoPath);
         }

@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Resources\OrderResource;
-use App\Filament\Resources\OrderResource\Pages\CreateOrder;
 use App\Filament\Resources\OrderResource\Pages\EditOrder;
 use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Filament\Resources\OrderResource\Pages\ViewOrder;
@@ -109,27 +108,13 @@ it('la cancellazione multipla dall elenco ripristina la giacenza di tutti gli or
     expect($this->prodotto->fresh()->stock)->toBe(26);
 });
 
-it('creando un ordine incrementa il numero della coda e scarica la giacenza', function () {
+it('non espone piu un form di creazione: si passa dalla cassa rapida', function () {
     actingAsAdmin();
 
-    Livewire::test(CreateOrder::class)
-        ->fillForm([
-            'queue_id' => $this->coda->id,
-            'orderItems' => [
-                ['product_id' => $this->prodotto->id, 'quantity' => 4, 'amount' => '3.00', 'row_amount' => '12.00'],
-            ],
-            'total_amount' => '12.00',
-            'total_paid' => '12.00',
-        ])
-        ->call('create')
-        ->assertHasNoFormErrors();
+    expect(OrderResource::getPages())->not->toHaveKey('create')
+        ->and(OrderResource::getPages())->toHaveKey('quick-create');
 
-    $ordine = Order::latest('id')->first();
-
-    expect($ordine->number)->toBe(42)
-        ->and($this->coda->fresh()->order_number)->toBe(42)
-        ->and($this->prodotto->fresh()->stock)->toBe(16)
-        ->and($ordine->orderItems->first()->name)->toBe($this->prodotto->name);
+    $this->get('/orders/create')->assertNotFound();
 });
 
 it('modificando le quantita corregge la giacenza del solo delta', function () {

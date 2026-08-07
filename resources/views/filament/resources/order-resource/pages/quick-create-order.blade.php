@@ -5,16 +5,31 @@
             class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="fi-section-content p-6">
                 <div class="flex items-center gap-4">
-                    <label class="text-sm font-medium text-gray-950 dark:text-white">
+                    <span class="shrink-0 text-sm font-medium text-gray-950 dark:text-white">
                         {{ __('filament.queue_label') }}
-                    </label>
-                    <select
-                        wire:model.live="queueId"
-                        class="fi-select-input rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900">
+                    </span>
+                    {{-- Le code stanno su una sola riga: se non ci stanno si
+                         scorre in orizzontale, così i pulsanti restano grandi
+                         e nella stessa posizione anche col touch. --}}
+                    <div
+                        role="radiogroup"
+                        aria-label="{{ __('filament.queue_label') }}"
+                        class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto py-1">
                         @foreach($this->getQueues() as $queue)
-                            <option value="{{ $queue['id'] }}">{{ $queue['label'] }}</option>
+                            <label class="shrink-0 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="queueId"
+                                    value="{{ $queue['id'] }}"
+                                    wire:model.live="queueId"
+                                    class="peer sr-only">
+                                <span
+                                    class="block whitespace-nowrap rounded-lg border-2 border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-all hover:border-primary-500 hover:bg-primary-50 peer-checked:border-primary-600 peer-checked:bg-primary-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 dark:border-gray-700 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:bg-primary-950 dark:peer-checked:border-primary-500 dark:peer-checked:bg-primary-500 dark:peer-checked:text-white">
+                                    {{ $queue['label'] }}
+                                </span>
+                            </label>
                         @endforeach
-                    </select>
+                    </div>
                 </div>
             </div>
         </div>
