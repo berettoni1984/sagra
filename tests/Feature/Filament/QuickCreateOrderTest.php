@@ -60,6 +60,16 @@ it('elenca le code nell ordine della tabella', function () {
     expect($ids->all())->toBe([$prima->id, $seconda->id]);
 });
 
+it('mostra le code come radio su una riga sola scorrevole', function () {
+    $html = Livewire::test(QuickCreateOrder::class)->html();
+
+    // niente select: pulsanti radio in orizzontale, senza andare a capo
+    expect($html)->toContain('role="radiogroup"')
+        ->and($html)->toContain('type="radio"')
+        ->and($html)->toContain('flex-nowrap')
+        ->and($html)->toContain('overflow-x-auto');
+});
+
 it('senza coda selezionata non elenca prodotti', function () {
     expect(Livewire::test(QuickCreateOrder::class)->set('queueId', null)->instance()->getProducts())->toBeEmpty();
 });
