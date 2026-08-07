@@ -46,16 +46,9 @@ class QuickCreateOrder extends Page
 
     public function mount(): void
     {
-        $queues = Queue::whereIsDisabled(false)->get();
-
-        if ($queues->count() === 1) {
-            $this->queueId = $queues->first()?->id;
-
-            return;
-        }
-        $defaultQueue = Queue::whereIsDisabled(false)->whereIsDefault(true)->first();
-        $this->queueId = $defaultQueue?->id;
-
+        // La coda preselezionata è la prima abilitata secondo l'ordinamento
+        // della tabella: con una sola coda abilitata è quella, senza flag.
+        $this->queueId = Queue::defaultQueue()?->id;
     }
 
     public function updatedQueueId(): void
@@ -389,7 +382,7 @@ class QuickCreateOrder extends Page
      */
     public function getQueues(): array
     {
-        return Queue::whereIsDisabled(false)
+        return Queue::enabledOrdered()
             ->get()
             ->map(fn ($queue) => [
                 'id' => $queue->id,

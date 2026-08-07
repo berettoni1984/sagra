@@ -75,29 +75,36 @@ class QueueResource extends Resource
                     ->label(__('filament.Reset Date')),
                 Forms\Components\Toggle::make('is_disabled')
                     ->label(__('filament.Is Disabled')),
-                Forms\Components\Toggle::make('is_default')
-                    ->label(__('filament.Is Default')),
+                // La posizione si cambia trascinando le righe in elenco: qui è
+                // solo in lettura, come per i prodotti.
+                Forms\Components\TextInput::make('order')
+                    ->label(__('filament.order_column'))
+                    ->helperText(__('filament.queue_order_hint'))
+                    ->readOnly()
+                    ->numeric()
+                    ->default(static function () {
+                        return (int) Queue::max('order') + 1;
+                    }),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
+            // L'ordine delle righe decide la coda preselezionata in cassa: la
+            // prima abilitata vince, non c'è più un flag "default".
+            ->authorizeReorder(true)
+            ->reorderable('order')
+            ->defaultSort('order', 'asc')
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label(__('filament.ID')),
+                Tables\Columns\TextColumn::make('order')
+                    ->label(__('filament.order_column')),
                 Tables\Columns\TextColumn::make('name')
                     ->label(__('filament.Name')),
                 Tables\Columns\TextColumn::make('comment')
                     ->label(__('filament.Comment')),
-                Tables\Columns\ToggleColumn::make('is_default')
-                    ->label(__('filament.Is Default'))
-                    ->afterStateUpdated(static function ($state, $record) {
-                        if ($state) {
-                            Queue::where('id', '!=', $record->id)
-                                ->update(['is_default' => false]);
-                        }
-                    }),
                 Tables\Columns\TextColumn::make('order_number')
                     ->label(__('filament.Order Number')),
                 Tables\Columns\TextColumn::make('reset_at')

@@ -24,7 +24,9 @@ class QueueFactory extends Factory
             'order_number' => 0,
             'reset_at' => null,
             'is_disabled' => false,
-            'is_default' => false,
+            // Come fa il form: la coda nuova si accoda alle esistenti, così la
+            // predefinita (la prima in ordine) resta quella già configurata.
+            'order' => static fn (): int => (int) Queue::max('order') + 1,
         ];
     }
 
@@ -33,9 +35,9 @@ class QueueFactory extends Factory
         return $this->state(['is_disabled' => true]);
     }
 
-    public function isDefault(): static
+    public function atOrder(int $order): static
     {
-        return $this->state(['is_default' => true]);
+        return $this->state(['order' => $order]);
     }
 
     public function resetAt(\DateTimeInterface|string $moment): static

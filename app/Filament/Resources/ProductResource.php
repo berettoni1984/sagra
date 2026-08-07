@@ -90,12 +90,14 @@ class ProductResource extends Resource
                 Forms\Components\Select::make('queues')
                     ->multiple()
                     ->label(__('filament.queue_label_plural'))
-                    ->options(fn () => Queue::all()->pluck('label', 'id'))
+                    ->options(fn () => Queue::ordered()->get()->pluck('label', 'id'))
                     ->searchable()
+                    // Su un prodotto nuovo si preseleziona la coda predefinita,
+                    // cioè la prima abilitata in ordine di tabella.
                     ->formatStateUsing(
                         fn ($record) => $record ?
                             $record->queues->pluck('id')->toArray() :
-                            Queue::whereIsDefault(true)->pluck('id')->toArray()
+                            array_filter([Queue::defaultQueue()?->id])
                     )
                     ->saveRelationshipsUsing(function ($component, $state) {
                         $component->getRecord()->queues()->sync($state ?? []);
@@ -203,7 +205,7 @@ class ProductResource extends Resource
                             ->label(__('filament.queue_label_plural'))
                             ->multiple()
                             ->options(
-                                Queue::all()->pluck('label', 'id')
+                                Queue::ordered()->get()->pluck('label', 'id')
                             ),
                     ])
                     ->query(function (Builder $query, array $data) {
@@ -248,7 +250,7 @@ class ProductResource extends Resource
                             Forms\Components\Select::make('queues')
                                 ->label(__('filament.queue_label_plural'))
                                 ->multiple()
-                                ->options(Queue::all()->pluck('label', 'id'))
+                                ->options(Queue::ordered()->get()->pluck('label', 'id'))
                                 ->required(),
                         ])
                         ->action(function (BulkAction $action, Collection $records, array $data) {

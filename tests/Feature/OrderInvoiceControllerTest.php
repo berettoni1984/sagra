@@ -60,11 +60,22 @@ it('ripiega su A5 invece di andare in errore con un formato scritto male', funct
 ]);
 
 it('mostra il logo predefinito quando esiste', function () {
-    Logo::factory()->isDefault()->create(['path' => 'logos/mio.png']);
+    Logo::factory()->atOrder(1)->create(['path' => 'logos/mio.png']);
 
     $this->get('/order/invoice/'.$this->order->id)
         ->assertSuccessful()
         ->assertSee('logos/mio.png', escape: false);
+});
+
+it('stampa il logo con la posizione piu bassa, non il primo creato', function () {
+    // il default non è più un flag: comanda l'ordine della tabella
+    Logo::factory()->atOrder(5)->create(['path' => 'logos/vecchio.png']);
+    Logo::factory()->atOrder(1)->create(['path' => 'logos/nuovo.png']);
+
+    $this->get('/order/invoice/'.$this->order->id)
+        ->assertSuccessful()
+        ->assertSee('logos/nuovo.png', escape: false)
+        ->assertDontSee('logos/vecchio.png', escape: false);
 });
 
 it('funziona anche senza alcun logo configurato', function () {

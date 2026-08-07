@@ -41,6 +41,25 @@ it('mostra solo i prodotti della coda selezionata e non quelli disabilitati', fu
         ->and($ids)->not->toContain($disabilitato->id);
 });
 
+it('preseleziona la prima coda abilitata in ordine di tabella', function () {
+    Queue::query()->delete();
+    Queue::factory()->disabled()->atOrder(1)->create();
+    $attesa = Queue::factory()->atOrder(2)->create();
+    Queue::factory()->atOrder(3)->create();
+
+    expect(Livewire::test(QuickCreateOrder::class)->get('queueId'))->toBe($attesa->id);
+});
+
+it('elenca le code nell ordine della tabella', function () {
+    Queue::query()->delete();
+    $seconda = Queue::factory()->atOrder(2)->create();
+    $prima = Queue::factory()->atOrder(1)->create();
+
+    $ids = collect(Livewire::test(QuickCreateOrder::class)->instance()->getQueues())->pluck('id');
+
+    expect($ids->all())->toBe([$prima->id, $seconda->id]);
+});
+
 it('senza coda selezionata non elenca prodotti', function () {
     expect(Livewire::test(QuickCreateOrder::class)->set('queueId', null)->instance()->getProducts())->toBeEmpty();
 });
