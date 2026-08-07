@@ -7,11 +7,9 @@ use App\Models\Config;
 use App\Models\Ingredient;
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\Queue;
 use App\Services\OrderStockService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -25,7 +23,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Throwable;
 
 /**
  * @SuppressWarnings("PHPMD.CouplingBetweenObjects")
@@ -261,7 +258,6 @@ class OrderResource extends Resource
                         }
                     }),
                 Forms\Components\TextInput::make('queue_tmp')
-                    ->hiddenOn(['create'])
                     ->label(__('filament.queue_label'))
                     ->inlineLabel()
                     ->readOnly()
@@ -271,60 +267,9 @@ class OrderResource extends Resource
                             return $record->queue->label ?? '';
                         }
                     ),
-                Forms\Components\Hidden::make('queue_id')
-                    ->hiddenOn(['create']),
-
-                Forms\Components\Select::make('queue_id')
-                    ->reactive()
-                    ->searchable()
-                    ->label(__('filament.queue_label'))
-                    ->required()
-                    ->inlineLabel()
-                    ->afterStateUpdated(static function ($get, $set) {
-                        $orderItems = $get('orderItems');
-                        $queueId = $get('queue_id');
-                        foreach ($orderItems as $key => $orderItem) {
-                            try {
-                                /** @var Product|null $p */
-                                $p = Product::find((int) $orderItem['product_id']);
-                                $exist = $p?->queues()
-                                    ->where('queues.id', $queueId)
-                                    ->exists();
-                                if (! $exist) {
-                                    $set('orderItems.'.$key.'.product_id', null);
-                                    $set('orderItems.'.$key.'.name', null);
-                                    $set('orderItems.'.$key.'.amount', null);
-
-                                    $set('orderItems.'.$key.'.row_amount', null);
-                                    $set('orderItems.'.$key.'.quantity', null);
-                                }
-                            } catch (Throwable $e) {
-                                $set('orderItems.'.$key.'.product_id', null);
-                                $set('orderItems.'.$key.'.name', null);
-                                $set('orderItems.'.$key.'.amount', null);
-
-                                $set('orderItems.'.$key.'.row_amount', null);
-                                $set('orderItems.'.$key.'.quantity', null);
-                            }
-                            $total = static::getTotal($get('orderItems'));
-                            $set('total_amount', $total);
-                            $set('total_paid', $get('free') ? '0.00' : $total);
-                        }
-                    })
-                    ->default(static function () {
-                        if (((int) Queue::whereIsDisabled(false)->count()) === 1) {
-                            return Queue::whereIsDisabled(false)->first()?->id;
-                        }
-
-                        return Queue::whereIsDisabled(false)->whereIsDefault(true)->first()?->id;
-                    })
-                    ->columnSpan(['default' => 4, 'lg' => 4, 'md' => 4, 'sm' => 4])
-                    ->options(static function () {
-                        return Queue::whereIsDisabled(false)
-                            ->get()
-                            ->pluck('label', 'id');
-                    })
-                    ->hiddenOn(['edit', 'view']),
+                // La coda di un ordine si sceglie solo in cassa rapida: qui
+                // resta di sola lettura, il form serve a modifica e stampa.
+                Forms\Components\Hidden::make('queue_id'),
             ]);
     }
 
@@ -409,7 +354,11 @@ class OrderResource extends Resource
             ])
             ->selectCurrentPageOnly(false)
             ->emptyStateActions([
-                CreateAction::make(),
+                // Rimanda alla cassa rapida: il form di creazione non esiste più.
+                Action::make('quickCreate')
+                    ->label(__('filament.Quick Create'))
+                    ->icon('heroicon-o-bolt')
+                    ->url(fn () => self::getUrl('quick-create')),
             ]);
     }
 
@@ -424,7 +373,8 @@ class OrderResource extends Resource
     {
         return [
             'index' => Pages\ListOrders::route('/'),
-            'create' => Pages\CreateOrder::route('/create'),
+            // Non c'è più un form di creazione "classico": gli ordini si
+            // emettono solo dalla cassa rapida.
             'quick-create' => Pages\QuickCreateOrder::route('/quick-create'),
             'view' => Pages\ViewOrder::route('/{record}'),
             'edit' => Pages\EditOrder::route('/{record}/edit'),

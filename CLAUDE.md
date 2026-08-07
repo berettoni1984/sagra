@@ -55,6 +55,8 @@ docker exec sagra-mysql-1 mysql -uroot -ppassword \
 
 ### Order creation flow
 
+Orders are created **only** from the quick till: `OrderResource` has no `create` page (the classic Filament create form was removed), so `ListOrders` and the table's empty state link to `quick-create` instead of a `CreateAction`. `OrderResource::form()` is now used for edit/view/print only — its `queue_id` is a `Hidden` field, the queue is chosen in the till.
+
 `QuickCreateOrder` (`app/Filament/Resources/OrderResource/Pages/QuickCreateOrder.php`) is a Filament/Livewire page holding the in-progress cart as plain component state — **not** Eloquent models:
 
 ```php
@@ -77,7 +79,7 @@ Several cashiers use this simultaneously on one database, so every write to a sh
 - **Per-queue order numbering** must read the counter under a row lock — `Queue::whereKey($id)->lockForUpdate()->first()` inside the transaction. A plain `find()` lets two tills read the same `order_number` and print two tickets with the same number.
 - **Stock changes** must go through `increment()`/`decrement()` (which emit `stock = stock - ?` in SQL), never `$model->stock -= $n; $model->save()`. The read-modify-write form silently loses one of two concurrent adjustments.
 
-Both order-creation paths need this (`QuickCreateOrder::createOrder()` and `CreateOrder::mutateFormDataBeforeCreate()`/`afterCreate()`), plus `EditOrder`'s save and delete hooks.
+This applies to `QuickCreateOrder::createOrder()` — the only creation path left — plus `EditOrder`'s save and delete hooks.
 
 ### Importer: read cast values, not raw CSV keys
 
