@@ -83,7 +83,13 @@ This applies to `QuickCreateOrder::createOrder()` — the only creation path lef
 
 ### Importer: read cast values, not raw CSV keys
 
-In `ProductImporter`, Filament runs `remapData()` then `castData()` *before* `resolveRecord()`, writing the cast value under the column's **canonical name** (`$this->data['backorder']`). Reading `$this->data[$this->columnMap['backorder']]` gets the untouched CSV string instead, where `(bool) 'FALSE'` is `true`. Also note `resolveRecord()` returning `null` makes Filament skip validation, fill, save *and* `afterSave()` for that row — which is why the create path syncs queues itself.
+In `ProductImporter`, Filament runs `remapData()` then `castData()` *before* `resolveRecord()`, writing the cast value under the column's **canonical name** (`$this->data['backorder']`). Reading `$this->data[$this->columnMap['backorder']]` gets the untouched CSV string instead, where `(bool) 'FALSE'` is `true`. Also note `resolveRecord()` returning `null` makes Filament skip validation, fill, save *and* `afterSave()` for that row **while still counting it as successful** — so a row that can't be resolved throws `RowImportFailedException` instead, which lands in the failure CSV with a readable message.
+
+### Products are identified by name, not by id
+
+`ProductImporter` has **no `id` column**: the CSV's only key is `name` (`requiredMapping`, `required`). An id taken from another environment used to win over the name and overwrite the wrong product. Matching is case-insensitive and ignores surrounding whitespace, via `Product::findByName()` / `Product::queryByName()` (`LOWER(TRIM(name)) = ?`); `Product::normalizeName()` also strips the U+00A0 that Excel CSVs carry, and runs as a `name` set-mutator so nothing can store a padded name. The CSV's spelling wins on a match, so an import can fix capitalization.
+
+The guarantee is enforced in the database too: `products.name` is unique on a `utf8mb4_unicode_ci` collation (pinned explicitly by `2026_08_19_120000_normalize_product_names_for_case_insensitive_matching`, which also trims existing names). Because of that, anything writing a product name must validate uniqueness case-insensitively — `ProductResource`'s form uses a closure rule over `Product::queryByName()` rather than `->unique()`, which would compare the raw typed value; the importer converts a `UniqueConstraintViolationException` (parallel chunks racing on the same name) into a failed row.
 
 ### Filament resources — query() is shared between read and write
 

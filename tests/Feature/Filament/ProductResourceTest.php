@@ -103,6 +103,31 @@ it('richiede nome prezzo e giacenza', function () {
         ->assertHasFormErrors(['name', 'price', 'stock']);
 });
 
+it('segnala il nome gia usato invece di far fallire il salvataggio', function () {
+    // products.name ha un indice unico: senza la regola sul campo il create
+    // moriva con l'errore SQL 1062 e la pagina restava in errore 500
+    Product::factory()->create(['name' => 'Panino']);
+
+    Livewire::test(CreateProduct::class)
+        ->fillForm(['name' => '  PANINO ', 'price' => 1, 'stock' => 0])
+        ->call('create')
+        ->assertHasFormErrors(['name']);
+
+    expect(Product::count())->toBe(1);
+});
+
+it('permette di risalvare un prodotto senza cambiargli il nome', function () {
+    // il controllo di unicita' deve escludere il record in modifica
+    $prodotto = Product::factory()->create(['name' => 'Piadina', 'stock' => 1]);
+
+    Livewire::test(EditProduct::class, ['record' => $prodotto->getKey()])
+        ->fillForm(['name' => 'Piadina', 'stock' => 4])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($prodotto->fresh()->stock)->toBe(4);
+});
+
 it('modifica un prodotto e sincronizza le code', function () {
     $prodotto = Product::factory()->create(['stock' => 5]);
     $vecchia = Queue::factory()->create();

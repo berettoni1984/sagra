@@ -4,10 +4,12 @@ namespace App\Filament\Imports;
 
 use App\Models\Product;
 use App\Models\Queue;
+use Filament\Actions\Imports\Exceptions\RowImportFailedException;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class ProductImporter extends Importer
 {
@@ -33,19 +35,13 @@ class ProductImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            // L'id serve solo a ritrovare il record: non va scritto sul model,
-            // altrimenti una cella vuota produce "set id = NULL" (SQL 1048)
-            // quando il prodotto viene ritrovato per nome.
-            ImportColumn::make('id')
-                ->requiredMapping()
-                ->numeric()
-                ->fillRecordUsing(fn ($record) => $record)
-                ->label(__('filament.ID')),
-            // Le regole validano solo i limiti, senza 'required': un import di
-            // solo aggiornamento (id + giacenza) non mappa name e price, e
-            // renderli obbligatori farebbe fallire ogni riga.
+            // Il nome è l'unica chiave dell'import: la colonna id non c'è più,
+            // perché un id proveniente da un altro ambiente vinceva sul nome e
+            // faceva aggiornare il prodotto sbagliato. Il confronto ignora
+            // maiuscole/minuscole e spazi ai bordi (Product::findByName()).
             ImportColumn::make('name')
-                ->rules(['nullable', 'string', 'max:255'])
+                ->requiredMapping()
+                ->rules(['required', 'string', 'max:255'])
                 ->fillRecordUsing(self::fillIfPresent('name'))
                 ->label(__('filament.Product Name')),
             ImportColumn::make('price')
@@ -86,22 +82,23 @@ class ProductImporter extends Importer
         // valori GIÀ castati sulla chiave col nome canonico della colonna.
         // Leggendo invece $this->columnMap[...] (l'header del CSV) si otterrebbe
         // la stringa grezza, e (bool) 'FALSE' vale true.
-        $product = Product::find($this->data['id'] ?? null);
+        // castStateItem() applica già trim(), qui si toglie anche lo spazio
+        // insecabile dei CSV di Excel.
+        $name = Product::normalizeName((string) ($this->data['name'] ?? ''));
 
-        if ($product instanceof Model) {
-            return $product;
+        if ($name === '') {
+            // Restituendo null Filament salterebbe validazione, fill, save e
+            // afterSave() contando però la riga fra quelle importate: una riga
+            // senza nome sparirebbe in silenzio. Con l'eccezione finisce nel CSV
+            // degli errori con un messaggio leggibile.
+            throw new RowImportFailedException(__('filament.import_row_without_product_name'));
         }
 
-        // Fallback sul nome: senza questo una riga con la colonna id vuota, o con
-        // un id proveniente da un altro ambiente, creava un doppione del prodotto
-        // invece di aggiornarlo.
-        $name = $this->data['name'] ?? null;
+        // Il nome normalizzato è anche quello che verrà scritto sul model: il
+        // listino del CSV fa da riferimento anche per maiuscole e spaziatura.
+        $this->data['name'] = $name;
 
-        if (blank($name)) {
-            return null;
-        }
-
-        $product = Product::firstWhere('name', $name);
+        $product = Product::findByName($name);
 
         if ($product instanceof Model) {
             return $product;
@@ -119,6 +116,24 @@ class ProductImporter extends Importer
             // sovrascrive se la colonna è mappata.
             'price' => 0,
         ]);
+    }
+
+    /**
+     * I chunk dell'import girano in job paralleli: due righe con lo stesso nome
+     * in chunk diversi possono passare entrambe da resolveRecord() senza vedersi
+     * (nessuna delle due transazioni è ancora committata) e la seconda sbatte
+     * sull'indice unico di products.name. Senza questa conversione la riga
+     * risultava fallita con l'errore SQL grezzo 1062.
+     */
+    public function saveRecord(): void
+    {
+        try {
+            parent::saveRecord();
+        } catch (UniqueConstraintViolationException) {
+            throw new RowImportFailedException(__('filament.import_duplicate_product_name', [
+                'name' => (string) ($this->data['name'] ?? ''),
+            ]));
+        }
     }
 
     public static function getCompletedNotificationBody(Import $import): string

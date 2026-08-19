@@ -63,6 +63,27 @@ class ProductResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required()
+                    ->maxLength(255)
+                    // products.name ha un indice unico e l'import ritrova i
+                    // prodotti solo dal nome: senza questa regola il salvataggio
+                    // moriva con l'errore SQL 1062 invece di segnalare il campo.
+                    // La regola nativa unique() non basterebbe: confronta il
+                    // valore così com'è digitato, mentre il model normalizza gli
+                    // spazi ai bordi, quindi " Panino" passava la validazione e
+                    // poi collideva con "Panino" in fase di scrittura.
+                    ->rule(static function (?Product $record): \Closure {
+                        return static function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
+                            $query = Product::queryByName((string) $value);
+
+                            if ($record !== null) {
+                                $query->whereKeyNot($record->getKey());
+                            }
+
+                            if ($query->exists()) {
+                                $fail(__('filament.duplicate_product_name'));
+                            }
+                        };
+                    })
                     ->label(__('filament.Name')),
                 Forms\Components\TextInput::make('price')
                     ->required()

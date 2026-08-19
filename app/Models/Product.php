@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\ProductFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -68,6 +69,50 @@ class Product extends Model
         'is_disabled',
         'order',
     ];
+
+    /**
+     * Normalizza il nome in scrittura: e' l'unica chiave con cui l'import
+     * ritrova i prodotti, quindi " Panino" e "Panino" non devono convivere.
+     *
+     * @return Attribute<string,string>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value): ?string => is_string($value) ? self::normalizeName($value) : $value,
+        );
+    }
+
+    /**
+     * Toglie gli spazi ai bordi, compreso lo spazio insecabile (U+00A0) che
+     * arriva dai CSV esportati da Excel: trim() da solo non lo intercetta.
+     */
+    public static function normalizeName(string $name): string
+    {
+        return (string) preg_replace('/^[\s\x{00A0}]+|[\s\x{00A0}]+$/u', '', $name);
+    }
+
+    /**
+     * Ricerca per nome senza distinguere maiuscole/minuscole ne' spazi ai bordi.
+     *
+     * L'indice unico su products.name usa una collation _ci, quindi il
+     * confronto e' gia' case-insensitive lato database: LOWER()/TRIM() lo
+     * rendono esplicito e coprono le righe storiche con spazi ai bordi.
+     *
+     * @return Builder<Product>
+     */
+    public static function queryByName(string $name): Builder
+    {
+        return self::query()->whereRaw(
+            'LOWER(TRIM(name)) = ?',
+            [mb_strtolower(self::normalizeName($name))],
+        );
+    }
+
+    public static function findByName(string $name): ?self
+    {
+        return self::queryByName($name)->first();
+    }
 
     /**
      * @return Attribute<string,string>

@@ -99,6 +99,22 @@ it('rende assegnabili in massa is_disabled backorder stock e order', function ()
         ->and($salvato->name)->toBe('Patatine');
 });
 
+it('toglie gli spazi ai bordi del nome in scrittura', function () {
+    // il nome e' l'unica chiave con cui l'import ritrova i prodotti: la
+    // collation _ci ignora gli spazi in coda ma non quelli iniziali
+    $product = Product::factory()->create(['name' => "  Panino\u{00A0} "]);
+
+    expect($product->fresh()->name)->toBe('Panino');
+});
+
+it('ritrova il prodotto per nome ignorando maiuscole e spazi ai bordi', function () {
+    $product = Product::factory()->create(['name' => 'Panino con salsiccia']);
+
+    expect(Product::findByName('  PANINO CON SALSICCIA ')?->id)->toBe($product->id)
+        ->and(Product::findByName('panino con salsiccia')?->id)->toBe($product->id)
+        ->and(Product::findByName('Panino'))->toBeNull();
+});
+
 it('non permette di assegnare in massa la chiave primaria', function () {
     $product = Product::factory()->create();
 

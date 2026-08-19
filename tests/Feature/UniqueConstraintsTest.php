@@ -61,6 +61,39 @@ it('products rifiuta due prodotti con lo stesso nome', function () {
         ->and(Product::where('name', 'PANINO UNICO')->count())->toBe(1);
 });
 
+it('products rifiuta due nomi che differiscono solo per le maiuscole', function () {
+    // l'import ritrova i prodotti solo dal nome: con una collation
+    // case-sensitive "Panino" e "PANINO" tornerebbero due prodotti distinti e
+    // ogni reimportazione con maiuscole diverse duplicherebbe il listino
+    Product::factory()->create(['name' => 'Panino']);
+
+    $codice = codiceSql(fn () => DB::table('products')->insert([
+        'name' => 'PANINO',
+        'price' => '1.00',
+    ]));
+
+    expect($codice)->toBe(1062)
+        ->and(Product::count())->toBe(1);
+});
+
+it('products.name usa una collation senza distinzione fra maiuscole e minuscole', function () {
+    $colonna = collect(DB::select('SHOW FULL COLUMNS FROM products'))
+        ->firstWhere('Field', 'name');
+
+    expect($colonna->Collation)->toEndWith('_ci');
+});
+
+it('products rifiuta due nomi che differiscono solo per gli spazi ai bordi', function () {
+    // la collation _ci ignora gli spazi in coda ma non quelli iniziali: li
+    // toglie il mutator del model, cosi' " Panino" non convive con "Panino"
+    Product::factory()->create(['name' => 'Panino']);
+
+    $codice = codiceSql(fn () => Product::factory()->create(['name' => '  Panino  ']));
+
+    expect($codice)->toBe(1062)
+        ->and(Product::count())->toBe(1);
+});
+
 it('products.order e indicizzato per l ordinamento predefinito', function () {
     $indici = collect(DB::select('SHOW INDEX FROM products'))->pluck('Column_name');
 
