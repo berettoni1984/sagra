@@ -16,6 +16,7 @@
         "laravel/horizon": "^5.23",
         "laravel/tinker": "^3.0",
         "lcobucci/jwt": "^5.2",
+        "openspout/openspout": "^4.32",
         "predis/predis": "^3.0",
         "spatie/laravel-health": "^1.40",
         "spatie/laravel-medialibrary": "^11.13",

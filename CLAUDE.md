@@ -91,6 +91,12 @@ In `ProductImporter`, Filament runs `remapData()` then `castData()` *before* `re
 
 The guarantee is enforced in the database too: `products.name` is unique on a `utf8mb4_unicode_ci` collation (pinned explicitly by `2026_08_19_120000_normalize_product_names_for_case_insensitive_matching`, which also trims existing names). Because of that, anything writing a product name must validate uniqueness case-insensitively — `ProductResource`'s form uses a closure rule over `Product::queryByName()` rather than `->unique()`, which would compare the raw typed value; the importer converts a `UniqueConstraintViolationException` (parallel chunks racing on the same name) into a failed row.
 
+### Printable price-list sheet (openspout)
+
+`QueueResource`'s `productSheet` record action hands back the XLSX built by `App\Services\QueueProductSheet`: header `Nome Prodotto | Prezzo | Qta`, one row per **enabled** product of that queue (ordered by `products.order`), the price printed as a number with a currency format and the quantity column left empty for filling in by hand, A4 portrait with `fitToWidth`, thin borders everywhere. Returning the `StreamedResponse` from `->action()` is what makes Livewire deliver it as a download — no intermediate page or route.
+
+It writes through `openspout/openspout` directly (a direct requirement, not just Filament's transitive one) because `spatie/simple-excel` doesn't expose page setup or per-cell borders. Two non-obvious constraints: an empty cell is only written to the sheet XML if its style has a fill/border/format — otherwise the table would show gaps instead of empty bordered boxes — and sheet names must stay within 31 characters without `[]:*?/\`.
+
 ### Filament resources — query() is shared between read and write
 
 Resources live in `app/Filament/Resources/*Resource.php`. Filament v5 tables take a single base query via `->query(Closure)`, and **that same query object is reused for every table-driven operation**, not just rendering — including bulk actions and `->reorderable()`'s drag-and-drop `UPDATE ... SET order = case ... end WHERE id IN (...)`. Any `leftJoin`/`groupBy`/custom `select` added to that base query purely for a display column (e.g. an aggregate) will leak into unrelated write statements against the model's own table.

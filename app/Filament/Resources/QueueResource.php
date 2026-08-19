@@ -4,12 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\QueueResource\Pages;
 use App\Models\Queue;
+use App\Services\QueueProductSheet;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -117,6 +119,25 @@ class QueueResource extends Resource
             ])
             ->recordActions([
                 EditAction::make(),
+                // Foglio A4 col listino della fila e la colonna prezzo vuota da
+                // riempire a mano. Restituire la risposta dall'action fa partire
+                // il download via Livewire, senza pagina intermedia.
+                Action::make('productSheet')
+                    ->label(__('filament.queue_product_sheet'))
+                    ->icon('heroicon-o-table-cells')
+                    ->color('gray')
+                    ->action(function (Queue $record, QueueProductSheet $sheet) {
+                        if ($sheet->products($record)->isEmpty()) {
+                            Notification::make()
+                                ->title(__('filament.queue_product_sheet_empty'))
+                                ->warning()
+                                ->send();
+
+                            return null;
+                        }
+
+                        return $sheet->download($record);
+                    }),
                 Action::make('resetNumber')
                     ->label(__('filament.reset_number'))
                     ->icon('heroicon-o-arrow-path')

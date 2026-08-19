@@ -97,6 +97,8 @@ return [
     'No' => 'No',
     'Yes' => 'Yes',
     'queue_order_hint' => 'La coda in cima all\'elenco è quella preselezionata in cassa. Trascina le righe per cambiare ordine.',
+    'queue_product_sheet' => 'Scarica listino',
+    'queue_product_sheet_empty' => 'Questa fila non ha prodotti attivi: niente da scaricare.',
     'logo_order_hint' => 'Il logo in cima all\'elenco è quello stampato sugli scontrini. Trascina le righe per cambiare ordine.',
     'work' => 'Lavoro',
     'settings' => 'Impostazioni',
