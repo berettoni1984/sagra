@@ -125,8 +125,8 @@
                                     </span>
                                 @endif
 
-                                {{-- Venduti dall'ultimo azzeramento della coda, sommati
-                                     su tutte le code in cui il prodotto è presente. --}}
+                                {{-- Venduti su questa coda dal suo ultimo azzeramento:
+                                     le vendite delle altre file non entrano. --}}
                                 <span class="text-xs text-gray-400 dark:text-gray-500">
                                     {{ __('filament.Sold') }}: {{ $product['sold'] }}
                                 </span>

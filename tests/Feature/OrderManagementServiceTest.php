@@ -176,8 +176,8 @@ it('delega getSoldSinceQueueReset al ProductEnrichmentService', function () {
     $order = Order::factory()->for($coda)->create();
     OrderItem::factory()->of($product, 6)->for($order)->create();
 
-    expect($this->manager->getSoldSinceQueueReset([$product->id]))
-        ->toBe($this->enrichment->getSoldSinceQueueReset([$product->id]))
+    expect($this->manager->getSoldSinceQueueReset([$product->id], $coda->id))
+        ->toBe($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))
         ->toBe([$product->id => 6]);
 });
 

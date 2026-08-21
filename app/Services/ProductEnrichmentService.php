@@ -14,20 +14,23 @@ class ProductEnrichmentService
     ) {}
 
     /**
-     * Quantità vendute per prodotto dall'ultimo reset della coda.
+     * Quantità vendute per prodotto sulla coda indicata, dal suo ultimo reset.
      *
-     * Ogni riga d'ordine viene confrontata con il reset_at della coda del
-     * proprio ordine, quindi un prodotto presente su più code somma
-     * automaticamente i venduti di ciascuna. Una sola query aggregata per
+     * Il conteggio è per coda: gli ordini di un'altra fila non entrano, perché
+     * anche l'azzeramento è per fila e sommandole il reset di una sola coda non
+     * avrebbe mai riportato il contatore a zero. Una sola query aggregata per
      * tutti i prodotti: viene invocata a ogni render della cassa.
      *
-     * Le code senza reset_at (mai azzerate) contano dall'inizio; gli ordini
-     * annullati non contano, perché la merce è già rientrata a magazzino.
+     * Una coda senza reset_at (mai azzerata) conta dall'inizio; gli ordini
+     * annullati non contano, perché la merce è già rientrata a magazzino. Gli
+     * ordini senza coda (storico di un'edizione precedente, quando queue_id era
+     * nullo) restano fuori: non hanno un reset a cui riferirsi e resterebbero
+     * nel conteggio per sempre.
      *
      * @param  array<int, int>  $productIds
      * @return array<int, int>
      */
-    public function getSoldSinceQueueReset(array $productIds): array
+    public function getSoldSinceQueueReset(array $productIds, int $queueId): array
     {
         if ($productIds === []) {
             return [];
@@ -35,8 +38,9 @@ class ProductEnrichmentService
 
         return OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->leftJoin('queues', 'queues.id', '=', 'orders.queue_id')
+            ->join('queues', 'queues.id', '=', 'orders.queue_id')
             ->whereIn('order_items.product_id', $productIds)
+            ->where('orders.queue_id', $queueId)
             ->whereNull('orders.deleted_at')
             ->where(static function (Builder $query): void {
                 $query->whereNull('queues.reset_at')

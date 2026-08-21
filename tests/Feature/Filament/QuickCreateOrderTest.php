@@ -245,9 +245,9 @@ it('mostra il trattino invece della giacenza per i prodotti backorder', function
         ->and($cardTracciato)->toContain($etichetta.': 10');
 });
 
-it('mostra i venduti dall azzeramento della coda sommando piu code', function () {
+it('mostra i venduti della coda selezionata dal suo azzeramento', function () {
     $codaA = Queue::factory()->resetAt(Carbon::parse('2026-08-01 10:00'))->create();
-    $codaB = Queue::factory()->resetAt(Carbon::parse('2026-08-02 10:00'))->create();
+    $codaB = Queue::factory()->create(['reset_at' => null]);
     $prodotto = Product::factory()->create();
     $prodotto->queues()->attach([$codaA->id, $codaB->id]);
 
@@ -261,13 +261,29 @@ it('mostra i venduti dall azzeramento della coda sommando piu code', function ()
     };
 
     $vendita($codaA, 3, '2026-08-01 12:00');   // conta
-    $vendita($codaB, 4, '2026-08-02 12:00');   // conta
     $vendita($codaA, 50, '2026-07-20 12:00');  // prima del reset di A
-    $vendita($codaB, 60, '2026-08-01 12:00');  // prima del reset di B
+    $vendita($codaB, 60, '2026-08-01 12:00');  // altra fila, mai azzerata
 
     $dati = collect(quickCreate($codaA)->instance()->getProducts())->firstWhere('id', $prodotto->id);
 
-    expect($dati['sold'])->toBe(7);
+    expect($dati['sold'])->toBe(3);
+});
+
+it('conta tra i venduti l ordine battuto subito dopo l azzeramento', function () {
+    // Giro completo cassa -> database -> cassa: con reset_at su un tipo di
+    // colonna diverso da created_at l'ordine appena battuto risultava anteriore
+    // all'azzeramento e i venduti restavano a 0.
+    $this->queue->update(['reset_at' => now()]);
+
+    quickCreate($this->queue)
+        ->call('addProduct', $this->product->id)
+        ->call('addProduct', $this->product->id)
+        ->call('createOrder');
+
+    $dati = collect(quickCreate($this->queue)->instance()->getProducts())
+        ->firstWhere('id', $this->product->id);
+
+    expect($dati['sold'])->toBe(2);
 });
 
 it('non conta tra i venduti gli ordini annullati', function () {

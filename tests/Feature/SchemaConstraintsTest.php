@@ -244,3 +244,13 @@ it('configs ha un indice unico sul codice', function () {
 
     expect($unici)->toBe([['code']]);
 });
+
+it('tiene queues.reset_at sullo stesso tipo di orders.created_at', function () {
+    // reset_at DATETIME (salvata alla lettera) contro created_at TIMESTAMP
+    // (convertita in UTC in scrittura) rendeva il confronto dei venduti
+    // sensibile al fuso: con reset_at avanti di due ore la cassa mostrava 0
+    // venduti su ogni ordine appena battuto.
+    expect(Schema::getColumnType('queues', 'reset_at'))
+        ->toBe(Schema::getColumnType('orders', 'created_at'))
+        ->toBe('timestamp');
+});

@@ -292,7 +292,8 @@ class QuickCreateOrder extends Page
 
         if ($this->soldCache === null) {
             $this->soldCache = $this->orderService->getSoldSinceQueueReset(
-                $products->pluck('id')->map(static fn ($id): int => (int) $id)->all()
+                $products->pluck('id')->map(static fn ($id): int => (int) $id)->all(),
+                $this->queueId
             );
         }
 

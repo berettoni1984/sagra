@@ -136,20 +136,21 @@ it('azzera le segnalazioni sul prodotto arricchito in backorder', function () {
 
 // ==================== getSoldSinceQueueReset ====================
 
-it('somma i venduti di un prodotto presente su due code con reset diversi', function () {
+it('conta solo i venduti della coda richiesta, non quelli delle altre file', function () {
     $product = Product::factory()->create();
 
     $codaA = Queue::factory()->resetAt(now()->subHours(2))->create();
-    $codaB = Queue::factory()->resetAt(now()->subMinutes(30))->create();
+    $codaB = Queue::factory()->create(['reset_at' => null]);
 
-    // dopo il reset della propria coda: contano
+    // dopo il reset di A: conta
     vendita($product, $codaA, 4, now()->subHour());
-    vendita($product, $codaB, 2, now()->subMinutes(10));
-    // prima del reset della propria coda: non contano
+    // prima del reset di A: non conta
     vendita($product, $codaA, 50, now()->subHours(3));
-    vendita($product, $codaB, 70, now()->subHours(1));
+    // altra fila, mai azzerata: non deve entrare nel conteggio di A, altrimenti
+    // azzerare A non riporterebbe mai il contatore a zero
+    vendita($product, $codaB, 70, now()->subHours(3));
 
-    expect($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 6]);
+    expect($this->enrichment->getSoldSinceQueueReset([$product->id], $codaA->id))->toBe([$product->id => 4]);
 });
 
 it('non conta gli ordini precedenti al reset della coda', function () {
@@ -158,7 +159,7 @@ it('non conta gli ordini precedenti al reset della coda', function () {
 
     vendita($product, $coda, 9, now()->subHours(5));
 
-    expect($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([]);
+    expect($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([]);
 });
 
 it('conta l ordine effettuato esattamente nell istante del reset', function () {
@@ -168,7 +169,7 @@ it('conta l ordine effettuato esattamente nell istante del reset', function () {
 
     vendita($product, $coda, 3, $istante);
 
-    expect($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 3]);
+    expect($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([$product->id => 3]);
 });
 
 it('conta tutto lo storico per una coda mai azzerata', function () {
@@ -178,7 +179,7 @@ it('conta tutto lo storico per una coda mai azzerata', function () {
     vendita($product, $coda, 3, now()->subDays(10));
     vendita($product, $coda, 5, now());
 
-    expect($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 8]);
+    expect($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([$product->id => 8]);
 });
 
 it('non conta le vendite di un ordine annullato', function () {
@@ -190,7 +191,7 @@ it('non conta le vendite di un ordine annullato', function () {
     $annullato->delete();
 
     expect($annullato->trashed())->toBeTrue()
-        ->and($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 6]);
+        ->and($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([$product->id => 6]);
 });
 
 it('non conta le righe di un ordine annullato le cui righe sono ancora attive', function () {
@@ -203,7 +204,7 @@ it('non conta le righe di un ordine annullato le cui righe sono ancora attive', 
     $riga->order->forceFill(['deleted_at' => now()])->saveQuietly();
 
     expect(OrderItem::query()->whereKey($riga->id)->exists())->toBeTrue()
-        ->and($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([]);
+        ->and($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([]);
 });
 
 it('non conta una riga d ordine cancellata', function () {
@@ -215,14 +216,15 @@ it('non conta una riga d ordine cancellata', function () {
     $cancellata = OrderItem::factory()->of($product, 100)->for($order)->create();
     $cancellata->delete();
 
-    expect($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 7]);
+    expect($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([$product->id => 7]);
 });
 
 it('restituisce un array vuoto senza prodotti in ingresso', function () {
     $product = Product::factory()->create();
-    vendita($product, Queue::factory()->create(), 5, now());
+    $coda = Queue::factory()->create();
+    vendita($product, $coda, 5, now());
 
-    expect($this->enrichment->getSoldSinceQueueReset([]))->toBe([]);
+    expect($this->enrichment->getSoldSinceQueueReset([], $coda->id))->toBe([]);
 });
 
 it('restituisce i venduti per prodotto senza contaminare gli altri prodotti', function () {
@@ -236,19 +238,22 @@ it('restituisce i venduti per prodotto senza contaminare gli altri prodotti', fu
     vendita($piadina, $coda, 1, now());
     vendita($mai, $coda, 9, now());
 
-    $sold = $this->enrichment->getSoldSinceQueueReset([$panino->id, $piadina->id]);
+    $sold = $this->enrichment->getSoldSinceQueueReset([$panino->id, $piadina->id], $coda->id);
 
     expect($sold)->toBe([$panino->id => 7, $piadina->id => 1])
         ->and($sold)->not->toHaveKey($mai->id);
 });
 
-it('conta anche gli ordini senza coda', function () {
+it('non conta gli ordini senza coda', function () {
+    // Lo storico di un'edizione precedente ha queue_id nullo: non ha un reset a
+    // cui riferirsi e contandolo nessun azzeramento riportava i venduti a zero.
     $product = Product::factory()->create();
+    $coda = Queue::factory()->resetAt(now())->create();
     $order = Order::factory()->withoutQueue()->create();
     OrderItem::factory()->of($product, 5)->for($order)->create();
 
     expect($order->queue_id)->toBeNull()
-        ->and($this->enrichment->getSoldSinceQueueReset([$product->id]))->toBe([$product->id => 5]);
+        ->and($this->enrichment->getSoldSinceQueueReset([$product->id], $coda->id))->toBe([]);
 });
 
 it('calcola i venduti con una sola query anche per molti prodotti', function () {
@@ -262,8 +267,8 @@ it('calcola i venduti con una sola query anche per molti prodotti', function () 
     }
 
     $sold = [];
-    $queries = countQueries(function () use (&$sold, $ids) {
-        $sold = $this->enrichment->getSoldSinceQueueReset($ids);
+    $queries = countQueries(function () use (&$sold, $ids, $coda) {
+        $sold = $this->enrichment->getSoldSinceQueueReset($ids, $coda->id);
     });
 
     expect($queries)->toBe(1)->and($sold)->toHaveCount(8);

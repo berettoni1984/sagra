@@ -111,9 +111,9 @@ class OrderManagementService
      * @param  array<int, int>  $productIds
      * @return array<int, int>
      */
-    public function getSoldSinceQueueReset(array $productIds): array
+    public function getSoldSinceQueueReset(array $productIds, int $queueId): array
     {
-        return $this->enrichmentService->getSoldSinceQueueReset($productIds);
+        return $this->enrichmentService->getSoldSinceQueueReset($productIds, $queueId);
     }
 
     /**
