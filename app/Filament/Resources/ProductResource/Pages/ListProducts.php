@@ -16,6 +16,12 @@ class ListProducts extends ListRecords
     {
         return [
             Actions\CreateAction::make(),
+            // Il pulsante segue chi puo' davvero aprire la pagina, per non
+            // portare su un 403 chi non ci arriva.
+            Actions\Action::make('sold')
+                ->label(__('filament.sold_products'))
+                ->visible(fn (): bool => ProductResource::canAccessSoldSheet())
+                ->url(ProductResource::getUrl('sold')),
             Actions\ExportAction::make()
                 ->label(__('filament.export_products'))
                 ->exporter(ProductExporter::class)

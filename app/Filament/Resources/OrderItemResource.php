@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HiddenFromCamerieri;
 use App\Filament\Resources\OrderItemResource\Pages;
 use App\Models\Config;
 use App\Models\OrderItem;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
  */
 class OrderItemResource extends Resource
 {
+    use HiddenFromCamerieri;
+
     protected static ?string $model = OrderItem::class;
 
     protected static string|null|\UnitEnum $navigationGroup = 'filament.statistics';

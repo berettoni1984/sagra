@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HiddenFromCamerieri;
 use App\Filament\Resources\QueueResource\Pages;
 use App\Models\Queue;
 use App\Services\QueueProductSheet;
@@ -22,6 +23,8 @@ use Filament\Tables\Table;
  */
 class QueueResource extends Resource
 {
+    use HiddenFromCamerieri;
+
     protected static ?string $model = Queue::class;
 
     protected static string|null|\UnitEnum $navigationGroup = 'filament.settings';

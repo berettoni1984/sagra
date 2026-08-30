@@ -57,6 +57,11 @@ function cassa(array $attributes = []): User
     return userWithRole(User::ROLE_CASSA, $attributes);
 }
 
+function cameriere(array $attributes = []): User
+{
+    return userWithRole(User::ROLE_CAMERIERI, $attributes);
+}
+
 /**
  * Autentica un admin e lo restituisce.
  */
@@ -71,6 +76,14 @@ function actingAsAdmin(array $attributes = []): User
 function actingAsCassa(array $attributes = []): User
 {
     $user = cassa($attributes);
+    test()->actingAs($user);
+
+    return $user;
+}
+
+function actingAsCameriere(array $attributes = []): User
+{
+    $user = cameriere($attributes);
     test()->actingAs($user);
 
     return $user;

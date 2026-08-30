@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HiddenFromCamerieri;
 use App\Filament\Resources\IngredientResource\Pages;
 use App\Models\Ingredient;
 use Filament\Actions\BulkActionGroup;
@@ -18,6 +19,8 @@ use Filament\Tables\Table;
  */
 class IngredientResource extends Resource
 {
+    use HiddenFromCamerieri;
+
     protected static ?string $model = Ingredient::class;
 
     protected static string|null|\UnitEnum $navigationGroup = 'filament.settings';

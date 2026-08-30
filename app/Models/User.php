@@ -65,6 +65,9 @@ class User extends Authenticatable implements FilamentUser
     /** Ruolo operativo di cassa. */
     public const ROLE_CASSA = 'cassa';
 
+    /** Ruolo di sala: vede solo gli ordini (elenco e dettaglio) e il venduto per coda. */
+    public const ROLE_CAMERIERI = 'camerieri';
+
     /**
      * {@inheritDoc}
      */
@@ -102,6 +105,21 @@ class User extends Authenticatable implements FilamentUser
     public function isAdmin(): bool
     {
         return $this->hasRole(self::ROLE_ADMIN);
+    }
+
+    public function isCassa(): bool
+    {
+        return $this->hasRole(self::ROLE_CASSA);
+    }
+
+    /**
+     * Un cameriere non e' un operatore del pannello: apre solo l'elenco ordini
+     * e il venduto per coda (vedi RestrictCameriereAccess). Un admin che avesse
+     * anche questo ruolo resta admin, altrimenti si chiuderebbe fuori da solo.
+     */
+    public function isCameriere(): bool
+    {
+        return $this->hasRole(self::ROLE_CAMERIERI) && ! $this->isAdmin();
     }
 
     /**
