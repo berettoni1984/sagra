@@ -43,6 +43,29 @@ class ProductResource extends Resource
         return __('filament.product_label');
     }
 
+    /**
+     * Chi puo' aprire il venduto per coda (ListProductsSold).
+     *
+     * Lo aprono tutti i ruoli operativi (admin, cassa, camerieri): quello che
+     * cambia e' il resto del pannello, che per i camerieri e' chiuso.
+     */
+    public static function canAccessSoldSheet(): bool
+    {
+        $user = auth()->user();
+
+        return ($user?->isAdmin() ?? false) || ($user?->isCassa() ?? false) || ($user?->isCameriere() ?? false);
+    }
+
+    /**
+     * La risorsa resta accessibile ai camerieri per la sola pagina del venduto
+     * (le altre le blocca RestrictCameriereAccess), ma la voce "Prodotti" nel
+     * menu impostazioni non li riguarda.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return ! (auth()->user()?->isCameriere() ?? false) && parent::shouldRegisterNavigation();
+    }
+
     public static function getNavigationGroup(): string|\UnitEnum|null
     {
         if (static::$navigationGroup instanceof \UnitEnum) {
@@ -300,6 +323,7 @@ class ProductResource extends Resource
     {
         return [
             'index' => Pages\ListProducts::route('/'),
+            'sold' => Pages\ListProductsSold::route('/sold'),
             'create' => Pages\CreateProduct::route('/create'),
             'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];

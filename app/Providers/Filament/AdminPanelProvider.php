@@ -3,6 +3,8 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Resources\OrderResource;
+use App\Filament\Resources\ProductResource;
+use App\Http\Middleware\RestrictCameriereAccess;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -52,7 +54,19 @@ class AdminPanelProvider extends PanelProvider
                     ->url(fn () => OrderResource::getUrl('quick-create'))
                     ->group(__('filament.work'))
                     ->sort(2)
+                    ->visible(fn (): bool => ! (auth()->user()?->isCameriere() ?? false))
                     ->icon('heroicon-o-shopping-cart'),
+                // Il venduto per coda e' una pagina della risorsa prodotti, che
+                // vive nel gruppo impostazioni: qui ha una voce sua sotto
+                // "Nuovo ordine", perche' e' il foglio che si guarda in sala.
+                NavigationItem::make()
+                    ->label(__('filament.products_sold'))
+                    ->url(fn () => ProductResource::getUrl('sold'))
+                    ->isActiveWhen(fn (): bool => request()->routeIs(ProductResource::getRouteBaseName().'.sold'))
+                    ->group(__('filament.work'))
+                    ->sort(3)
+                    ->visible(fn (): bool => ProductResource::canAccessSoldSheet())
+                    ->icon('heroicon-o-clipboard-document-list'),
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
@@ -72,6 +86,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                RestrictCameriereAccess::class,
             ]);
     }
 }

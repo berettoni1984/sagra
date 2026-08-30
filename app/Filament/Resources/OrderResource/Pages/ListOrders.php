@@ -34,6 +34,7 @@ class ListOrders extends ListRecords
                 ->color('danger')
                 ->requiresConfirmation(),
             Actions\ExportAction::make()
+                ->visible(fn (): bool => ! (auth()->user()?->isCameriere() ?? false))
                 ->label(__('filament.export_orders'))
                 ->exporter(OrderExporter::class)
                 ->formats([
@@ -43,6 +44,7 @@ class ListOrders extends ListRecords
             // Unica via per creare un ordine: la cassa rapida. Il form classico
             // di creazione non esiste più.
             Actions\Action::make('quickCreate')
+                ->visible(fn (): bool => ! (auth()->user()?->isCameriere() ?? false))
                 ->label(__('filament.Quick Create'))
                 ->icon('heroicon-o-bolt')
                 ->color('warning')

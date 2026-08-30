@@ -105,6 +105,11 @@ class OrderResource extends Resource
         return (auth()->user()?->isAdmin() ?? false) && parent::canForceDelete($record);
     }
 
+    public static function canCreate(): bool
+    {
+        return ! (auth()->user()?->isCameriere() ?? false) && parent::canCreate();
+    }
+
     public static function getNavigationGroup(): string|\UnitEnum|null
     {
         if (static::$navigationGroup instanceof \UnitEnum) {
@@ -335,6 +340,7 @@ class OrderResource extends Resource
                 Action::make('print')
                     ->icon('heroicon-o-printer')
                     ->url(fn ($record) => static::getUrl('print', ['record' => $record->id, 'print' => true]))
+                    ->visible(fn (): bool => ! (auth()->user()?->isCameriere() ?? false))
                     ->label(__('filament.Print')),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([

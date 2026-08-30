@@ -123,5 +123,10 @@ return [
     'Leave empty to use full amount' => 'Lascia vuoto per usare l\'importo completo',
     'Roles' => 'Ruoli',
     'Sold' => 'Venduti',
+    'Qty Done' => 'Qta Completata',
+    'Qty Remaining' => 'Qta Rimanente',
+    'Number Now' => 'Numero Attuale',
+    'products_sold' => 'Venduto per coda',
+    'sold_products' => 'Prodotti Venduti',
 
 ];
